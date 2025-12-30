@@ -57,10 +57,9 @@ if (PRIVATE_KEY && STYLUS_CONTRACT_ADDRESS) {
 // --- STRICT MODEL LIST ---
 // ✅ UPGRADE 2: Prioritized Stronger Models for "Judge" capabilities
 const MODELS = [
-   // "gemini-3-flash-preview",
+    //"gemini-3-flash-preview",
     //"gemini-2.5-flash",
     "gemini-2.5-flash-lite",
-    "gemini-2.5-pro",
     "gemini-2.0-flash-exp",
     "gemini-2.0-flash"
 ];
@@ -77,143 +76,332 @@ const CHAIN_MAP = {
 const createProvider = (url) => url ? new ethers.JsonRpcProvider(url) : null;
 
 const providers = {
-    arbitrum: createProvider(process.env.RPC_ARBITRUM),
+    // L1
     ethereum: createProvider(process.env.RPC_ETHEREUM),
+    ethereum_sepolia: createProvider(process.env.RPC_SEPOLIA_ETH),
+
+    // L2 - Arbitrum
+    arbitrum: createProvider(process.env.RPC_ARBITRUM),
+    arbitrum_sepolia: createProvider(process.env.RPC_SEPOLIA_ARBITRUM),
+    //arbitrum_sepolia: relayerProvider, // Already connected via relayer
+
+    // L2 - Base
     base: createProvider(process.env.RPC_BASE),
+    base_sepolia: createProvider(process.env.RPC_SEPOLIA_BASE), // <--- ADD THIS
+
+    // L2 - Optimism
     optimism: createProvider(process.env.RPC_OPTIMISM),
+    optimism_sepolia: createProvider(process.env.RPC_SEPOLIA_OPTIMISM), // <--- ADD THIS
+
+    // Sidechain - Polygon
     polygon: createProvider(process.env.RPC_POLYGON),
-    arbitrum_sepolia: relayerProvider,
-    ethereum_sepolia: createProvider(process.env.RPC_SEPOLIA_ETH)
+    polygon_amoy: createProvider(process.env.RPC_AMOY_POLYGON) // <--- ADD THIS
 };
 
 
 // --- TOP TOKEN LIST ---
 const KNOWN_TOKENS = {
-    // Stablecoins
-    "USDC": { address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", decimals: 6, chain: "arbitrum" },
-    "USDT": { address: "0xdAC17F958D2ee523a2206206994597C13D831ec7", decimals: 6, chain: "ethereum" },
-    "DAI": { address: "0x6B175474E89094C44Da98b954EedeAC495271d0F", decimals: 18, chain: "ethereum" },
-    // Native/Wrapped
-    "WETH": { address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", decimals: 18, chain: "arbitrum" },
-    "WBTC": { address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", decimals: 8, chain: "ethereum" },
-    "WSOL": { address: "0xD31a59c85aE9D8edEFeC411D448f90841571b89c", decimals: 9, chain: "ethereum" },
-    // L2 Governance
-    "ARB": { address: "0x912CE59144191C1204E64559FE8253a0e49E6548", decimals: 18, chain: "arbitrum" },
-    "OP": { address: "0x4200000000000000000000000000000000000042", decimals: 18, chain: "optimism" },
-    // Blue Chips
-    "UNI": { address: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984", decimals: 18, chain: "ethereum" },
-    "LINK": { address: "0x514910771AF9Ca656af840dff83E8264EcF986CA", decimals: 18, chain: "ethereum" },
-    // Memes
-    "PEPE": { address: "0x25d887Ce7a35172C62FeBFD67a1856F20FaEbB00", decimals: 18, chain: "arbitrum" }, // Arbitrum PEPE
-    "SHIB": { address: "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE", decimals: 18, chain: "ethereum" },
-    "DOGE": { address: "0x4206931337dc273a630d328dA6441786BfaD668f", decimals: 8, chain: "ethereum" } // Wrapped Doge (Example)
-};
+    "USDC": {
+        decimals: 6, chain: "arbitrum",
+        address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+        addresses: {
+            arbitrum: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+            arbitrum_sepolia: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
+            base: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            base_sepolia: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+            optimism: "0x0b2C630C530732FEa45460Cd35C474f865234e9A",
+            optimism_sepolia: "0x5fd84259d66Cd46123540766Be93DFE6D43130D7",
+            polygon: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+            polygon_amoy: "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+            ethereum: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            ethereum_sepolia: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+        }
+    },
+    "USDT": {
+        decimals: 6, chain: "ethereum",
+        address: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        addresses: {
+            ethereum_sepolia: "0x7169d38820dfd117c3fa1f22a697dba58d90ba06",
+            arbitrum_sepolia: "0x30fa2fbe15c1eadfbef28c188b7b8dbd3c1ff2eb",
+            base_sepolia: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2",
+            optimism_sepolia: "0xB9467B24117FD79D56F396ADC3cCDB695D905ae4",
+            polygon_amoy: "0x28c02587ecb9e4b6ca3dd4d73f5567069ae01601"
+        }
+    },
+    "DAI": {
+        decimals: 18, chain: "ethereum",
+        address: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+        addresses: {
+            ethereum_sepolia: "0x776b6fc2ed15d6bb5fc32e0c89de68683118c62a",
+            arbitrum_sepolia: "0xb62E7317d620FB112E147FeA8132c877B62e2490",
+            base_sepolia: "0x50c5725949a6f0c72e6c4a641f24049a917db0cb",
+            optimism_sepolia: "0x68194a729c2450ad26072b3d33adacbcef39d574",
+            polygon_amoy: "0x2ef1c802355c500a3493f2db8cb9c24af12c42b0"
+        }
+    },
+    "EURC": {
+        decimals: 6, chain: "ethereum",
+        address: "0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c", // Mainnet
+        addresses: {
+            ethereum_sepolia: "0x08210F9170F89Ab7658F0B5E3fF39b0E03C594D4",
+            base_sepolia: "0x808456652fdb597867f38412077A9182d42431c8"
+        }
+    },
+    "GHO": {
+        decimals: 18, chain: "ethereum",
+        address: "0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f",
+        addresses: { ethereum_sepolia: "0xc4bF5CbDaBE595361438F8c6a187bDc330539c60" }
+    },
+    "LUSD": {
+        decimals: 18, chain: "optimism",
+        addresses: { optimism_sepolia: "0xdec90295c5243450974da3868f70691535492822" }
+    },
+    // 2. WRAPPED ASSETS (WETH, WBTC, cbETH)
+    "WETH": {
+        decimals: 18, chain: "arbitrum",
+        address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+        addresses: {
+            arbitrum: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+            arbitrum_sepolia: "0x980B62Da83eFf3D4576C647993b0c1D7faf17c73",
+            base: "0x4200000000000000000000000000000000000006",
+            base_sepolia: "0x4200000000000000000000000000000000000006",
+            optimism: "0x4200000000000000000000000000000000000006",
+            optimism_sepolia: "0x4200000000000000000000000000000000000006",
+            polygon_amoy: "0x700dDE29De87ed2c01c27C896dc8Badb4f671302",
+            ethereum_sepolia: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14"
+        },
+        "WBTC": {
+            decimals: 8, chain: "ethereum",
+            address: "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+            addresses: {
+                ethereum_sepolia: "0x92f3b59a79bff5dc60c0d59ea13a44d082b2bdfc",
+                arbitrum_sepolia: "0x7de5bffc5370d93b974b67bab4492a9e13b8b3c1",
+                base_sepolia: "0x0555E30da8f98308EdB960aa94C0Db47230d2B9c",
+                optimism_sepolia: "0x8E9066978411d3106886e33e9d486F5831E47C2d",
+                polygon_amoy: "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf"
+            }
+        },
+        "CBETH": {
+            decimals: 18, chain: "base",
+            addresses: { base_sepolia: "0x2ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec22" }
+        },
 
-// ✅ UPGRADE 1: KNOWN COLLECTIONS DATABASE
-// This allows quests like "Must own a Pudgy Penguin" to work instantly.
-const KNOWN_COLLECTIONS = {
-    "PUDGY PENGUINS": { address: "0xBd3531dA5CF5857e7CfAA92426877b022e612cf8", chain: "ethereum" },
-    "BAYC": { address: "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D", chain: "ethereum" },
-    "AZUKI": { address: "0xED5AF388653567Af2F388E6224dC7C4b3241C544", chain: "ethereum" },
-    "MAYC": { address: "0x60E4d786628Fea6478F785A6d7e704777c86a7c6", chain: "ethereum" },
-    "ENS": { address: "0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85", chain: "ethereum" }, // Base Registrar
-    "ARB ODYSSEY": { address: "0xFAe39EC09730CA0F14262A636D2d7C5539353752", chain: "arbitrum" }, // Example Badge
-    "UNISWAP V3 POS": { address: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88", chain: "arbitrum" }, // LP Positions
-    "GALXE OAT": { address: "0x5D470270e889b61c08C51784cCB73265D0293a9C", chain: "arbitrum" } // Galxe
-};
+        // 3. BLUE CHIPS & GOVERNANCE (LINK, UNI, AAVE, COMP)
+        "LINK": {
+            decimals: 18, chain: "ethereum",
+            address: "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+            addresses: {
+                ethereum_sepolia: "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+                arbitrum_sepolia: "0xb1D4538B4571d411F07960EF2838Ce337FE1E80E",
+                base_sepolia: "0xa8c6da47368db76b8c272ff3a738f4e22b8c4917",
+                optimism_sepolia: "0xE4aB69C077896252FAFBD49EFD26B5D171A32410",
+                polygon_amoy: "0x0Fd9e8d3aF1aaee056EB9e802c3A762a667b1904"
+            }
+        },
+        "UNI": {
+            decimals: 18, chain: "ethereum",
+            address: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+            addresses: {
+                ethereum_sepolia: "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984",
+                arbitrum_sepolia: "0xfa7f8980b0f1e64a2062791cc3b0871572f1f7f0",
+                base_sepolia: "0x74f4b0101a7b9704ad59843a11778af91e7942aa",
+                optimism_sepolia: "0x64582136a88d1c949b67bb69fcb33c6073254245",
+                polygon_amoy: "0x401906cbfB0db46545c49986145Eb5373763ec77"
+            }
+        },
+        "AAVE": {
+            decimals: 18, chain: "ethereum",
+            address: "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
+            addresses: {
+                ethereum_sepolia: "0x5bb220afc6e2e008cb2302a83536a019ed245aa2",
+                arbitrum_sepolia: "0xba5ddd1f9d7f570dc94a51479a000e3bce967196",
+                base_sepolia: "0x4e65fe4dba92790696d040ac24aa414708f5c0ab",
+                polygon_amoy: "0x4BDf0193aF01dF6b6Ff14A97eECE42071575d706"
+            }
+        },
+        "COMP": {
+            decimals: 18, chain: "ethereum",
+            addresses: { base_sepolia: "0x03ebb3f62ff52dcf4fecf2de91875c0fd3a7ab6a" }
+        },
 
-// --- TOOL DEFINITIONS ---
-const toolsDefinition = [
-    // ✅ UPGRADE 2: "Deep History" Stats
-    // Supports: "Gas Spender", "Inactive Wallet", "Wallet Age", "High Roller"
-    {
-        name: "check_evm_stats",
-        description: "Checks DEEP financial history: Native ETH Balance, Tx Count, Wallet Age (Days), Total Gas Spent, Last Activity, and Max Tx Value.",
-        parameters: {
-            type: "OBJECT",
-            properties: {
-                address: { type: "STRING" },
-                chain: { type: "STRING" }
-            },
-            required: ["address", "chain"]
+        // 4. L2 NATIVE TOKENS (ARB, OP, GMX, SNX, POL)
+        "ARB": {
+            address: "0x912CE59144191C1204E64559FE8253a0e49E6548", chain: "arbitrum", decimals: 18,
+            addresses: { arbitrum_sepolia: "0xc275B23C035a9d4EC8867b47f55427E0bDCe14cB" }
+        },
+        "OP": {
+            address: "0x4200000000000000000000000000000000000042", chain: "optimism", decimals: 18,
+            addresses: { optimism_sepolia: "0x4ba3a5ab2ec0c9c45f153374fbcb05a1526c4a01" }
+        },
+        "GMX": {
+            decimals: 18, chain: "arbitrum",
+            addresses: { arbitrum_sepolia: "0xfc5A1A6EB076a2C7aD06eD22C90d7E710E35ad0a" }
+        },
+        "RDNT": {
+            decimals: 18, chain: "arbitrum",
+            addresses: { arbitrum_sepolia: "0xb1f77a877d46696f9fe88ef6a274969a3004dee4" }
+        },
+        "SNX": {
+            decimals: 18, chain: "optimism",
+            addresses: { optimism_sepolia: "0x8700daec35af8ff88c16bdf0418774cb3d7599b4" }
+        },
+        "VELO": {
+            decimals: 18, chain: "optimism",
+            addresses: { optimism_sepolia: "0x9560e827af36c94d2ac33a39bce1fe78631088db" }
+        },
+        "POL": {
+            decimals: 18, chain: "polygon",
+            // Native Gas Token on Amoy (Replaces MATIC)
+            addresses: { polygon_amoy: "0x0000000000000000000000000000000000001010" }
+        },
+        "CRV": {
+            decimals: 18, chain: "ethereum",
+            addresses: { polygon_amoy: "0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0" }
+        },
+        "QUICK": {
+            decimals: 18, chain: "polygon",
+            addresses: { polygon_amoy: "0x41e94eb019c0762f9bfcf9fb1e58725bfb0e7582" }
+        },
+
+        // 5. MEME COINS (Mainnet Only - No Official Testnet Contracts)
+        "PEPE": { address: "0x25d887Ce7a35172C62FeBFD67a1856F20FaEbB00", decimals: 18, chain: "arbitrum" },
+        "SHIB": { address: "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE", decimals: 18, chain: "ethereum" }
+}};
+
+    // ✅ UPGRADE 1: KNOWN COLLECTIONS DATABASE
+    // This allows quests like "Must own a Pudgy Penguin" to work instantly.
+    const KNOWN_COLLECTIONS = {
+        "PUDGY PENGUINS": { address: "0xBd3531dA5CF5857e7CfAA92426877b022e612cf8", chain: "ethereum" },
+        "BAYC": { address: "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D", chain: "ethereum" },
+        "AZUKI": { address: "0xED5AF388653567Af2F388E6224dC7C4b3241C544", chain: "ethereum" },
+        "MAYC": { address: "0x60E4d786628Fea6478F785A6d7e704777c86a7c6", chain: "ethereum" },
+        "ENS": { address: "0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85", chain: "ethereum" }, // Base Registrar
+        "ARB ODYSSEY": { address: "0xFAe39EC09730CA0F14262A636D2d7C5539353752", chain: "arbitrum" }, // Example Badge
+        "UNISWAP V3 POS": { address: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88", chain: "arbitrum" }, // LP Positions
+        "GALXE OAT": { address: "0x5D470270e889b61c08C51784cCB73265D0293a9C", chain: "arbitrum" } // Galxe
+    };
+
+    // --- TOOL DEFINITIONS ---
+    const toolsDefinition = [
+        // ✅ UPGRADE 2: "Deep History" Stats
+        // Supports: "Gas Spender", "Inactive Wallet", "Wallet Age", "High Roller"
+        {
+            name: "check_evm_stats",
+            description: "Checks DEEP financial history: Native ETH Balance, Tx Count, Wallet Age (Days), Total Gas Spent, Last Activity, and Max Tx Value.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    address: { type: "STRING" },
+                    chain: { type: "STRING" }
+                },
+                required: ["address", "chain"]
+            }
+        },
+        {
+            name: "check_token_balance",
+            description: "Checks balance of specific ERC-20 tokens (USDC, USDT, WETH, WBTC, PEPE, ARB, etc).",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    address: { type: "STRING" },
+                    tokenSymbol: { type: "STRING" },
+                    chain: { type: "STRING" }
+                },
+                required: ["address", "tokenSymbol", "chain"]
+            }
+        },
+        // ✅ UPGRADE 3: Collection-Aware NFT Check
+        // Supports: "Pudgy Holder", "ENS Owner"
+        {
+            name: "check_nft_ownership",
+            description: "Checks ownership of NFTs. Can check by 'collectionName' (e.g. 'Pudgy Penguins', 'ENS') OR 'contractAddress'.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    address: { type: "STRING" },
+                    collectionName: { type: "STRING", description: "Name of collection (e.g. 'BAYC') or Contract Address" },
+                    chain: { type: "STRING" }
+                },
+                required: ["address", "collectionName", "chain"]
+            }
+        },
+        {
+            name: "check_discord_membership",
+            description: "Checks Discord Guild membership and Roles.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    userId: { type: "STRING" },
+                    guildId: { type: "STRING" },
+                    roleId: { type: "STRING" }
+                },
+                required: ["userId", "guildId"]
+            }
+        },
+        {
+            name: "check_social_mock",
+            description: "Verifies Social Web2 Actions (Twitter, YouTube, Spotify, GitHub).",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    platform: { type: "STRING" },
+                    action: { type: "STRING" },
+                    username: { type: "STRING" }
+                },
+                required: ["platform"]
+            }
+        },
+        {
+            name: "check_sybil_geo_real",
+            description: "REAL Check: Verifies GPS Location (Lat/Long) or Sybil Score (Wallet Analysis).",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    checkType: { type: "STRING", description: "Either 'geo' or 'sybil'" },
+                    address: { type: "STRING", description: "Wallet address for Sybil check" },
+                    latitude: { type: "NUMBER", description: "GPS Latitude from user" },
+                    longitude: { type: "NUMBER", description: "GPS Longitude from user" }
+                },
+                required: ["checkType"]
+            }
         }
-    },
-    {
-        name: "check_token_balance",
-        description: "Checks balance of specific ERC-20 tokens (USDC, USDT, WETH, WBTC, PEPE, ARB, etc).",
-        parameters: {
-            type: "OBJECT",
-            properties: {
-                address: { type: "STRING" },
-                tokenSymbol: { type: "STRING" },
-                chain: { type: "STRING" }
-            },
-            required: ["address", "tokenSymbol", "chain"]
-        }
-    },
-    // ✅ UPGRADE 3: Collection-Aware NFT Check
-    // Supports: "Pudgy Holder", "ENS Owner"
-    {
-        name: "check_nft_ownership",
-        description: "Checks ownership of NFTs. Can check by 'collectionName' (e.g. 'Pudgy Penguins', 'ENS') OR 'contractAddress'.",
-        parameters: {
-            type: "OBJECT",
-            properties: {
-                address: { type: "STRING" },
-                collectionName: { type: "STRING", description: "Name of collection (e.g. 'BAYC') or Contract Address" },
-                chain: { type: "STRING" }
-            },
-            required: ["address", "collectionName", "chain"]
-        }
-    },
-    {
-        name: "check_discord_membership",
-        description: "Checks Discord Guild membership and Roles.",
-        parameters: {
-            type: "OBJECT",
-            properties: {
-                userId: { type: "STRING" },
-                guildId: { type: "STRING" },
-                roleId: { type: "STRING" }
-            },
-            required: ["userId", "guildId"]
-        }
-    },
-    {
-        name: "check_social_mock",
-        description: "Verifies Social Web2 Actions (Twitter, YouTube, Spotify, GitHub).",
-        parameters: {
-            type: "OBJECT",
-            properties: {
-                platform: { type: "STRING" },
-                action: { type: "STRING" },
-                username: { type: "STRING" }
-            },
-            required: ["platform"]
-        }
-    },
-    {
-        name: "check_sybil_geo_real",
-        description: "REAL Check: Verifies GPS Location (Lat/Long) or Sybil Score (Wallet Analysis).",
-        parameters: {
-            type: "OBJECT",
-            properties: {
-                checkType: { type: "STRING", description: "Either 'geo' or 'sybil'" },
-                address: { type: "STRING", description: "Wallet address for Sybil check" },
-                latitude: { type: "NUMBER", description: "GPS Latitude from user" },
-                longitude: { type: "NUMBER", description: "GPS Longitude from user" }
-            },
-            required: ["checkType"]
-        }
-    }
-];
+    ];
+
+    // --- HELPER: SMART CHAIN RESOLVER ---
+    // Detects "Arb Sepolia", "Base Sepolia", etc.
+    // Defaults to Ethereum Sepolia if no specific L2 is mentioned.
+    function resolveChainAlias(input) {
+        if (!input) return 'ethereum'; // Default to Mainnet if empty
+const s = input.toLowerCase();
+
+// 1. SEPOLIA TESTNET LOGIC
+if (s.includes('sepolia') || s.includes('testnet')) {
+    if (s.includes('arb')) return 'arbitrum_sepolia';
+    if (s.includes('op') || s.includes('optimism')) return 'optimism_sepolia';
+    if (s.includes('base')) return 'base_sepolia';
+    if (s.includes('poly') || s.includes('matic')) return 'polygon_amoy';
+
+    // 🛑 User Request: Default to ETH Sepolia if no specific chain is found
+    return 'ethereum_sepolia';
+}
+
+// 2. MAINNET LOGIC
+if (s.includes('arb')) return 'arbitrum';
+if (s.includes('op') || s.includes('optimism')) return 'optimism';
+if (s.includes('base')) return 'base';
+if (s.includes('poly') || s.includes('matic')) return 'polygon';
+if (s.includes('bsc') || s.includes('binance')) return 'bsc';
+
+// Default
+return 'ethereum';
+}
 
 
 // --- TOOL IMPLEMENTATIONS ---
 const functions = {
     // 1. DEEP FINANCIAL HISTORY CHECK (Etherscan + RPC)
     check_evm_stats: async ({ address, chain }) => {
-        let selectedChain = chain.toLowerCase().replace('eth', 'ethereum').replace('arb', 'arbitrum');
+        const selectedChain = resolveChainAlias(chain);
 
         try {
             const provider = providers[selectedChain];
@@ -292,31 +480,60 @@ const functions = {
         } catch (e) { return { error: e.message }; }
     },
 
-    // 2. TOKEN BALANCE CHECK (Unchanged but robust)
+
+    // 2. TOKEN BALANCE CHECK
     check_token_balance: async ({ address, tokenSymbol, chain }) => {
+        // A. Handle Native ETH
+        if (tokenSymbol.toUpperCase() === 'ETH' || tokenSymbol.toUpperCase() === 'WETH') {
+            const stats = await functions.check_evm_stats({ address, chain });
+            return { symbol: "ETH", balance: stats.balance_eth, chain: stats.chain, raw_data: stats };
+        }
+
         const token = KNOWN_TOKENS[tokenSymbol.toUpperCase()];
         if (!token) return { error: `Token '${tokenSymbol}' not in database.` };
 
         try {
-            const targetChain = chain || token.chain;
+            // B. Resolve Chain
+            const targetChain = chain ? resolveChainAlias(chain) : token.chain;
+
+            // C. Find the Correct Address (THIS IS THE MISSING PART)
+            let targetAddress = token.address; // Default
+
+            // Check your new "addresses" list for a match
+            if (token.addresses && token.addresses[targetChain]) {
+                targetAddress = token.addresses[targetChain];
+            }
+            // Fallback for logic mismatch
+            else if (targetChain !== token.chain) {
+                return { error: "Token Not Supported on Chain", details: `No contract for ${tokenSymbol} on ${targetChain}.` };
+            }
+
+            // D. Fetch Balance
             const provider = providers[targetChain];
             if (!provider) return { error: `Provider for ${targetChain} not configured` };
 
-            const contract = new ethers.Contract(token.address, ["function balanceOf(address) view returns (uint256)"], provider);
+            // Safety Check
+            const code = await provider.getCode(targetAddress);
+            if (code === "0x") return { error: "Contract not found", details: `No contract at ${targetAddress} on ${targetChain}` };
+
+            const contract = new ethers.Contract(targetAddress, ["function balanceOf(address) view returns (uint256)"], provider);
             const bal = await contract.balanceOf(address);
 
             return {
                 symbol: tokenSymbol,
                 balance: ethers.formatUnits(bal, token.decimals),
                 chain: targetChain,
-                raw_balance: bal.toString()
+                contract: targetAddress
             };
         } catch (e) { return { error: `Fetch failed for ${tokenSymbol}: ${e.message}` }; }
     },
 
-    // 3. NFT CHECK (Now supports "Pudgy Penguins" name lookup)
+    // 3. NFT CHECK (Fixed for 10-Chain Support)
     check_nft_ownership: async ({ address, contractAddress, collectionName, chain }) => {
-        let selectedChain = chain ? chain.toLowerCase().replace('eth', 'ethereum') : null;
+        // ✅ FIX 1: Use the Smart Resolver!
+        // This ensures "Sepolia" -> "ethereum_sepolia", "Amoy" -> "polygon_amoy", etc.
+        let selectedChain = chain ? resolveChainAlias(chain) : null;
+
         let targetAddress = contractAddress;
 
         // Auto-resolve Name -> Address (e.g. "Pudgy Penguins" -> 0xBd3...)
@@ -324,7 +541,8 @@ const functions = {
             const col = KNOWN_COLLECTIONS[collectionName.toUpperCase()];
             if (col) {
                 targetAddress = col.address;
-                if (!selectedChain) selectedChain = col.chain;
+                // If user didn't specify a chain, use the collection's default
+                if (!selectedChain) selectedChain = resolveChainAlias(col.chain);
             }
         }
 
@@ -332,16 +550,20 @@ const functions = {
 
         try {
             const provider = providers[selectedChain];
+            if (!provider) return { error: `Provider for ${selectedChain} not configured` };
+
             // ERC-721 "balanceOf" is standard
             const contract = new ethers.Contract(targetAddress, ["function balanceOf(address) view returns (uint256)"], provider);
             const bal = await contract.balanceOf(address);
+
             return {
                 collection: collectionName || "Unknown",
                 contract: targetAddress,
                 balance: bal.toString(),
-                owns_nft: bal > 0n
+                owns_nft: bal > 0n,
+                chain: selectedChain
             };
-        } catch (e) { return { error: "NFT Check failed" }; }
+        } catch (e) { return { error: "NFT Check failed", details: e.message }; }
     },
 
     // 4. DISCORD DEEP CHECK (Roles + Join Dates)
@@ -636,6 +858,7 @@ async function runGatekeeper(rule, user_data, modelIndex = 0) {
         ### HALLUCINATION GUARD:
         - NEVER call a tool for Trivia (e.g. "What is 2+2?").
         - If a tool returns an error (e.g. "Token not found") -> REJECT.
+        - DO NOT approve just because the user asks nicely.
 
         ### SECURITY PROTOCOL (CRITICAL):
         - If the user is WRONG, do NOT reveal the correct answer.
@@ -683,6 +906,7 @@ async function runGatekeeper(rule, user_data, modelIndex = 0) {
 
                 // Execute Tool
                 const output = await fn(toolArgs);
+                //console.log("🔍 DEBUG - Tool Output:", JSON.stringify(output, null, 2));
 
                 // Send Output back to Gemini
                 result = await chat.sendMessage([{ functionResponse: { name: call.name, response: { content: output } } }]);
@@ -717,7 +941,7 @@ function parseAIResponse(text) {
     const start = clean.indexOf('{');
     const end = clean.lastIndexOf('}');
     if (start === -1 || end === -1) throw new Error("No JSON object found in response");
-    
+
     clean = clean.substring(start, end + 1);
 
     try {
@@ -760,9 +984,9 @@ app.post('/api/verify', async (req, res) => {
         // Generate Handoff Token if approved
         if (decision.approved) {
             const proofToken = crypto.randomBytes(16).toString('hex');
-            verifiedSessions.set(proofToken, { 
+            verifiedSessions.set(proofToken, {
                 timestamp: Date.now(),
-                valid: true 
+                valid: true
             });
             decision.proofToken = proofToken;
         }

@@ -1,0 +1,20 @@
+# Dependencies
+node_modules
+target
+dist
+build
+.next
+out
+
+package-lock.json
+yarn.lock
+cargo.lock
+
+*.png
+*.jpg
+*.svg
+*.ico
+*.pdf
+
+# Git
+.git
