@@ -25,7 +25,7 @@ function getQuestMode(rule: string, typeParam: string | null) {
     if (r.includes('discord') || r.includes('twitter') || r.includes('follow') || r.includes('follows') || r.includes('followers') || r.includes('youtube') || r.includes('role') || r.includes('username') || r.includes('handle')) {
         return 'TRIVIA';
     }
-    if (r.includes('location') || r.includes('Location') || r.includes('gps') || r.includes('is in') || r.includes('should be in') || r.includes('must be in') || r.includes('country') || r.includes('geographical') || r.includes('region') || r.includes('city') || typeParam === 'geo') return 'GEO';
+    if (r.includes('location') || r.includes('Location') || r.includes('gps') || r.includes('is in') || r.includes('should be in') || r.includes('must be in') || r.includes('country') || r.includes('geographical') || r.includes('region') || r.includes('vpn') || r.includes('city') || typeParam === 'geo') return 'GEO';
     if (typeParam === 'wallet' || r.includes('eth') || r.includes('should have') || r.includes('must hold') || r.includes('must have') || r.includes('hold') || r.includes('tokens') || r.includes('token') || r.includes('wallet') || r.includes('eth') || r.includes('ETH') || r.includes('network') || r.includes('balance')) return 'WALLET';
     return 'TRIVIA';
 }
@@ -35,13 +35,14 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
     const questType = searchParams.get('type');
     const modeParam = searchParams.get('mode');
 
-    // 🚨 FIX: Destructure disconnectWallet
+    // 🚨 ENSURE WalletContext EXPORTS disconnectWallet
     const { account, connectWallet, disconnectWallet } = useWallet();
     const currentMode = getQuestMode(rule, questType);
 
     // --- STATE MACHINE ---
     const [viewState, setViewState] = useState<'intro' | 'checking' | 'success_logic' | 'method_select' | 'scanning_qr' | 'biometric_pad' | 'completed' | 'mobile_geo_landing'>('intro');
 
+    const [discordUser, setDiscordUser] = useState<{ id: string, username: string } | null>(null);
     const [input, setInput] = useState('');
     const [proofToken, setProofToken] = useState<string | null>(null);
     const [errorMsg, setErrorMsg] = useState('');
@@ -49,7 +50,7 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
 
     // 1. Check for Biometric Hardware on Mount
     useEffect(() => {
-        if (window.PublicKeyCredential) {
+        if (typeof window !== 'undefined' && window.PublicKeyCredential) {
             PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
                 .then(setHasBioHardware)
                 .catch(() => setHasBioHardware(false));
@@ -57,19 +58,41 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
     }, []);
 
     // 2. 🚨 PRIVACY FIX: NUCLEAR DISCONNECT ON MOUNT
-    // This clears the persistence flag immediately so the Context cannot auto-reconnect.
     useEffect(() => {
-        disconnectWallet();
+        if (disconnectWallet) disconnectWallet();
         if (typeof window !== 'undefined') {
             localStorage.removeItem('isWalletConnected');
         }
     }, []); // Runs once on mount
 
+    const handleDiscordLogin = () => {
+        // Open the backend auth route in a popup
+        const width = 500, height = 700;
+        const left = (window.innerWidth - width) / 2;
+        const top = (window.innerHeight - height) / 2;
+
+        const popup = window.open(
+            `${API_URL}/auth/discord`,
+            'Discord Login',
+            `width=${width},height=${height},top=${top},left=${left}`
+        );
+
+        // Listen for the data sent back from server.js
+        const messageHandler = (event: MessageEvent) => {
+            if (event.data?.type === 'DISCORD_CONNECTED') {
+                setDiscordUser(event.data.user);
+                setInput("CONNECTED_VIA_OAUTH"); // Dummy value to enable the verify button
+                window.removeEventListener('message', messageHandler);
+            }
+        };
+
+        window.addEventListener('message', messageHandler);
+    };
+
     // 3. 🚨 CRITICAL FIX: FORCE WALLET SELECTION
-    // This uses 'wallet_requestPermissions' to override MetaMask's caching.
     const handleForceConnect = async () => {
         // 1. Clear internal state first
-        disconnectWallet();
+        if (disconnectWallet) disconnectWallet();
         if (typeof window !== 'undefined') localStorage.removeItem('isWalletConnected');
 
         if (typeof window !== 'undefined' && (window as any).ethereum) {
@@ -149,6 +172,8 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                     user_data: {
                         address: account || "0x0000000000000000000000000000000000000000",
                         answer: payloadInput || "CHECK_CONDITION",
+                        // ✅ NEW: Send the OAuth Discord ID if available
+                        discordId: discordUser ? discordUser.id : undefined,
                         latitude: geoData.lat,
                         longitude: geoData.lng
                     }
@@ -173,8 +198,7 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
             setErrorMsg("Verification Server Error");
             setViewState('intro');
         }
-    }, [account, rule, dropId, input, currentMode, onVerificationComplete, modeParam]);
-
+    }, [account, rule, dropId, input, currentMode, onVerificationComplete, modeParam, discordUser]);
 
     // --- RENDER HELPERS ---
     const headerIcon = {
@@ -242,32 +266,69 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
 
 
                     {/* =====================================================================================
-                 STATE: INTRO (The Entry Point) 
-                ===================================================================================== */}
+                     STATE: INTRO (The Entry Point) 
+                    ===================================================================================== */}
                     {viewState === 'intro' && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
 
-                            {/* TRIVIA INPUT */}
+                            {/* TRIVIA & DISCORD LOGIC */}
                             {currentMode === 'TRIVIA' && (
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={input}
-                                        onChange={(e) => setInput(e.target.value)}
-                                        placeholder="Enter answer..."
-                                        className="flex-1 bg-black/20 border border-white/5 text-white p-4 rounded-xl outline-none focus:border-purple-500/50 transition-all placeholder:text-zinc-600 focus:bg-black/40"
-                                        onKeyDown={(e) => e.key === 'Enter' && performVerify()}
-                                    />
-                                    <button onClick={() => performVerify()} disabled={!input} className="px-5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:scale-105 text-white rounded-xl transition-all shadow-lg shadow-purple-900/20 disabled:opacity-50 disabled:hover:scale-100">
-                                        <ArrowRight className="w-5 h-5" />
-                                    </button>
+                                <div className="space-y-4">
+
+                                    {/* A. DISCORD BUTTON MODE */}
+                                    {rule.toLowerCase().includes('discord') ? (
+                                        <div className="flex flex-col gap-3">
+                                            {!discordUser ? (
+                                                <button
+                                                    onClick={handleDiscordLogin}
+                                                    className="w-full py-4 bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
+                                                >
+                                                    {/* Discord Logo SVG */}
+                                                    <svg className="w-5 h-5 fill-current" viewBox="0 0 127 96"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22c.63-23.28-1.24-45.66-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z" /></svg>
+                                                    Connect Discord
+                                                </button>
+                                            ) : (
+                                                <div className="bg-[#5865F2]/20 border border-[#5865F2]/50 p-4 rounded-xl flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                                        <span className="text-white font-bold">{discordUser.username}</span>
+                                                    </div>
+                                                    <span className="text-[#5865F2] text-xs font-mono">ID: {discordUser.id}</span>
+                                                </div>
+                                            )}
+
+                                            <button
+                                                onClick={() => performVerify()}
+                                                disabled={!discordUser}
+                                                className={`w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${!discordUser ? 'bg-white/5 text-zinc-600 cursor-not-allowed' : 'bg-white text-black hover:scale-[1.02]'
+                                                    }`}
+                                            >
+                                                Verify Membership <ArrowRight className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                    ) : (
+                                        /* B. NORMAL TRIVIA INPUT (Fallback) */
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={input}
+                                                onChange={(e) => setInput(e.target.value)}
+                                                placeholder="Enter answer..."
+                                                className="flex-1 bg-black/20 border border-white/5 text-white p-4 rounded-xl outline-none focus:border-purple-500/50 transition-all placeholder:text-zinc-600 focus:bg-black/40"
+                                                onKeyDown={(e) => e.key === 'Enter' && performVerify()}
+                                            />
+                                            <button onClick={() => performVerify()} disabled={!input} className="px-5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:scale-105 text-white rounded-xl transition-all shadow-lg shadow-purple-900/20 disabled:opacity-50 disabled:hover:scale-100">
+                                                <ArrowRight className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
-                            {/* WALLET CONNECT (UPDATED FOR PRIVACY) */}
+                            {/* WALLET CONNECT */}
                             {currentMode === 'WALLET' && (
                                 !account ? (
-                                    // 🚨 FIX: Using handleForceConnect instead of connectWallet
                                     <button onClick={handleForceConnect} className="w-full py-4 bg-white text-black font-bold rounded-xl flex items-center justify-center gap-2 transition-all hover:bg-zinc-200 shadow-[0_0_15px_rgba(255,255,255,0.2)]">
                                         <Wallet className="w-5 h-5" /> Connect to Verify
                                     </button>
@@ -276,8 +337,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                                         <button onClick={() => performVerify()} className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition-all">
                                             <ScanLine className="w-5 h-5" /> Scan {account.slice(0, 6)}...{account.slice(-4)}
                                         </button>
-
-                                        {/* 🚨 FIX: Using handleForceConnect here too */}
                                         <button onClick={handleForceConnect} className="w-full text-xs text-zinc-500 hover:text-white transition-colors underline decoration-zinc-700">
                                             Use different wallet
                                         </button>
@@ -310,8 +369,8 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                     )}
 
                     {/* =====================================================================================
-                 STATE: MOBILE GEO LANDING
-                ===================================================================================== */}
+                     STATE: MOBILE GEO LANDING
+                    ===================================================================================== */}
                     {viewState === 'mobile_geo_landing' && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-6">
                             <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto border border-green-500/20">
@@ -337,8 +396,8 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
 
 
                     {/* =====================================================================================
-                 STATE: LOADING 
-                ===================================================================================== */}
+                     STATE: LOADING 
+                    ===================================================================================== */}
                     {viewState === 'checking' && (
                         <div className="flex flex-col items-center justify-center py-10">
                             <Loader2 className="w-10 h-10 text-purple-500 animate-spin mb-4" />
@@ -348,8 +407,8 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
 
 
                     {/* =====================================================================================
-                 STATE: SUCCESS LOGIC (Transition)
-                ===================================================================================== */}
+                     STATE: SUCCESS LOGIC (Transition)
+                    ===================================================================================== */}
                     {viewState === 'success_logic' && (
                         <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center py-6">
                             <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-500/30">
@@ -362,8 +421,8 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
 
 
                     {/* =====================================================================================
-                 STATE: METHOD SELECTION
-                ===================================================================================== */}
+                     STATE: METHOD SELECTION
+                    ===================================================================================== */}
                     {viewState === 'method_select' && (
                         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
                             <div className="text-center mb-6">
@@ -405,8 +464,8 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
 
 
                     {/* =====================================================================================
-                 STATE: SCANNING QR
-                ===================================================================================== */}
+                     STATE: SCANNING QR
+                    ===================================================================================== */}
                     {viewState === 'scanning_qr' && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
                             <h3 className="text-lg font-bold text-white mb-2">Scan to Complete</h3>
@@ -430,8 +489,8 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
 
 
                     {/* =====================================================================================
-                 STATE: BIOMETRIC PAD
-                ===================================================================================== */}
+                     STATE: BIOMETRIC PAD
+                    ===================================================================================== */}
                     {viewState === 'biometric_pad' && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                             {proofToken ? (
@@ -452,8 +511,8 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
 
 
                     {/* =====================================================================================
-                 STATE: COMPLETED
-                ===================================================================================== */}
+                     STATE: COMPLETED
+                    ===================================================================================== */}
                     {viewState === 'completed' && (
                         <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center py-8">
                             <div className="w-24 h-24 bg-gradient-to-tr from-green-400 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/30 animate-pulse">
@@ -474,6 +533,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
 
                 </motion.div>
             </AnimatePresence>
-        </div>
+        </div >
     );
 }

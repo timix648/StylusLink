@@ -12,7 +12,7 @@ const app = express();
 
 // ✅ FIX: PERMISSIVE CORS CONFIGURATION
 app.use(cors({
-    origin: '*',
+    origin: ['https://probable-eureka-5gqr7qv9wx75c75r7-3001.app.github.dev'],
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -57,11 +57,12 @@ if (PRIVATE_KEY && STYLUS_CONTRACT_ADDRESS) {
 // --- STRICT MODEL LIST ---
 // ✅ UPGRADE 2: Prioritized Stronger Models for "Judge" capabilities
 const MODELS = [
-    //"gemini-3-flash-preview",
-    //"gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
     "gemini-2.0-flash-exp",
-    "gemini-2.0-flash"
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-3-flash-preview"
+
 ];
 
 // --- CHAIN & RPC SETUP ---
@@ -266,134 +267,135 @@ const KNOWN_TOKENS = {
         // 5. MEME COINS (Mainnet Only - No Official Testnet Contracts)
         "PEPE": { address: "0x25d887Ce7a35172C62FeBFD67a1856F20FaEbB00", decimals: 18, chain: "arbitrum" },
         "SHIB": { address: "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE", decimals: 18, chain: "ethereum" }
-}};
+    }
+};
 
-    // ✅ UPGRADE 1: KNOWN COLLECTIONS DATABASE
-    // This allows quests like "Must own a Pudgy Penguin" to work instantly.
-    const KNOWN_COLLECTIONS = {
-        "PUDGY PENGUINS": { address: "0xBd3531dA5CF5857e7CfAA92426877b022e612cf8", chain: "ethereum" },
-        "BAYC": { address: "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D", chain: "ethereum" },
-        "AZUKI": { address: "0xED5AF388653567Af2F388E6224dC7C4b3241C544", chain: "ethereum" },
-        "MAYC": { address: "0x60E4d786628Fea6478F785A6d7e704777c86a7c6", chain: "ethereum" },
-        "ENS": { address: "0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85", chain: "ethereum" }, // Base Registrar
-        "ARB ODYSSEY": { address: "0xFAe39EC09730CA0F14262A636D2d7C5539353752", chain: "arbitrum" }, // Example Badge
-        "UNISWAP V3 POS": { address: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88", chain: "arbitrum" }, // LP Positions
-        "GALXE OAT": { address: "0x5D470270e889b61c08C51784cCB73265D0293a9C", chain: "arbitrum" } // Galxe
-    };
+// ✅ UPGRADE 1: KNOWN COLLECTIONS DATABASE
+// This allows quests like "Must own a Pudgy Penguin" to work instantly.
+const KNOWN_COLLECTIONS = {
+    "PUDGY PENGUINS": { address: "0xBd3531dA5CF5857e7CfAA92426877b022e612cf8", chain: "ethereum" },
+    "BAYC": { address: "0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D", chain: "ethereum" },
+    "AZUKI": { address: "0xED5AF388653567Af2F388E6224dC7C4b3241C544", chain: "ethereum" },
+    "MAYC": { address: "0x60E4d786628Fea6478F785A6d7e704777c86a7c6", chain: "ethereum" },
+    "ENS": { address: "0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85", chain: "ethereum" }, // Base Registrar
+    "ARB ODYSSEY": { address: "0xFAe39EC09730CA0F14262A636D2d7C5539353752", chain: "arbitrum" }, // Example Badge
+    "UNISWAP V3 POS": { address: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88", chain: "arbitrum" }, // LP Positions
+    "GALXE OAT": { address: "0x5D470270e889b61c08C51784cCB73265D0293a9C", chain: "arbitrum" } // Galxe
+};
 
-    // --- TOOL DEFINITIONS ---
-    const toolsDefinition = [
-        // ✅ UPGRADE 2: "Deep History" Stats
-        // Supports: "Gas Spender", "Inactive Wallet", "Wallet Age", "High Roller"
-        {
-            name: "check_evm_stats",
-            description: "Checks DEEP financial history: Native ETH Balance, Tx Count, Wallet Age (Days), Total Gas Spent, Last Activity, and Max Tx Value.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    address: { type: "STRING" },
-                    chain: { type: "STRING" }
-                },
-                required: ["address", "chain"]
-            }
-        },
-        {
-            name: "check_token_balance",
-            description: "Checks balance of specific ERC-20 tokens (USDC, USDT, WETH, WBTC, PEPE, ARB, etc).",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    address: { type: "STRING" },
-                    tokenSymbol: { type: "STRING" },
-                    chain: { type: "STRING" }
-                },
-                required: ["address", "tokenSymbol", "chain"]
-            }
-        },
-        // ✅ UPGRADE 3: Collection-Aware NFT Check
-        // Supports: "Pudgy Holder", "ENS Owner"
-        {
-            name: "check_nft_ownership",
-            description: "Checks ownership of NFTs. Can check by 'collectionName' (e.g. 'Pudgy Penguins', 'ENS') OR 'contractAddress'.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    address: { type: "STRING" },
-                    collectionName: { type: "STRING", description: "Name of collection (e.g. 'BAYC') or Contract Address" },
-                    chain: { type: "STRING" }
-                },
-                required: ["address", "collectionName", "chain"]
-            }
-        },
-        {
-            name: "check_discord_membership",
-            description: "Checks Discord Guild membership and Roles.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    userId: { type: "STRING" },
-                    guildId: { type: "STRING" },
-                    roleId: { type: "STRING" }
-                },
-                required: ["userId", "guildId"]
-            }
-        },
-        {
-            name: "check_social_mock",
-            description: "Verifies Social Web2 Actions (Twitter, YouTube, Spotify, GitHub).",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    platform: { type: "STRING" },
-                    action: { type: "STRING" },
-                    username: { type: "STRING" }
-                },
-                required: ["platform"]
-            }
-        },
-        {
-            name: "check_sybil_geo_real",
-            description: "REAL Check: Verifies GPS Location (Lat/Long) or Sybil Score (Wallet Analysis).",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    checkType: { type: "STRING", description: "Either 'geo' or 'sybil'" },
-                    address: { type: "STRING", description: "Wallet address for Sybil check" },
-                    latitude: { type: "NUMBER", description: "GPS Latitude from user" },
-                    longitude: { type: "NUMBER", description: "GPS Longitude from user" }
-                },
-                required: ["checkType"]
-            }
+// --- TOOL DEFINITIONS ---
+const toolsDefinition = [
+    // ✅ UPGRADE 2: "Deep History" Stats
+    // Supports: "Gas Spender", "Inactive Wallet", "Wallet Age", "High Roller"
+    {
+        name: "check_evm_stats",
+        description: "Checks DEEP financial history: Native ETH Balance, Tx Count, Wallet Age (Days), Total Gas Spent, Last Activity, and Max Tx Value.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                address: { type: "STRING" },
+                chain: { type: "STRING" }
+            },
+            required: ["address", "chain"]
         }
-    ];
+    },
+    {
+        name: "check_token_balance",
+        description: "Checks balance of specific ERC-20 tokens (USDC, USDT, WETH, WBTC, PEPE, ARB, etc).",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                address: { type: "STRING" },
+                tokenSymbol: { type: "STRING" },
+                chain: { type: "STRING" }
+            },
+            required: ["address", "tokenSymbol", "chain"]
+        }
+    },
+    // ✅ UPGRADE 3: Collection-Aware NFT Check
+    // Supports: "Pudgy Holder", "ENS Owner"
+    {
+        name: "check_nft_ownership",
+        description: "Checks ownership of NFTs. Can check by 'collectionName' (e.g. 'Pudgy Penguins', 'ENS') OR 'contractAddress'.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                address: { type: "STRING" },
+                collectionName: { type: "STRING", description: "Name of collection (e.g. 'BAYC') or Contract Address" },
+                chain: { type: "STRING" }
+            },
+            required: ["address", "collectionName", "chain"]
+        }
+    },
+    {
+        name: "check_discord_membership",
+        description: "Checks Discord Guild membership and Roles.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                userId: { type: "STRING" },
+                guildId: { type: "STRING" },
+                roleId: { type: "STRING" }
+            },
+            required: ["userId", "guildId"]
+        }
+    },
+    {
+        name: "check_social_mock",
+        description: "Verifies Social Web2 Actions (Twitter, YouTube, Spotify, GitHub).",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                platform: { type: "STRING" },
+                action: { type: "STRING" },
+                username: { type: "STRING" }
+            },
+            required: ["platform"]
+        }
+    },
+    {
+        name: "check_sybil_geo_real",
+        description: "REAL Check: Verifies GPS Location (Lat/Long) or Sybil Score (Wallet Analysis).",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                checkType: { type: "STRING", description: "Either 'geo' or 'sybil'" },
+                address: { type: "STRING", description: "Wallet address for Sybil check" },
+                latitude: { type: "NUMBER", description: "GPS Latitude from user" },
+                longitude: { type: "NUMBER", description: "GPS Longitude from user" }
+            },
+            required: ["checkType"]
+        }
+    }
+];
 
-    // --- HELPER: SMART CHAIN RESOLVER ---
-    // Detects "Arb Sepolia", "Base Sepolia", etc.
-    // Defaults to Ethereum Sepolia if no specific L2 is mentioned.
-    function resolveChainAlias(input) {
-        if (!input) return 'ethereum'; // Default to Mainnet if empty
-const s = input.toLowerCase();
+// --- HELPER: SMART CHAIN RESOLVER ---
+// Detects "Arb Sepolia", "Base Sepolia", etc.
+// Defaults to Ethereum Sepolia if no specific L2 is mentioned.
+function resolveChainAlias(input) {
+    if (!input) return 'ethereum'; // Default to Mainnet if empty
+    const s = input.toLowerCase();
 
-// 1. SEPOLIA TESTNET LOGIC
-if (s.includes('sepolia') || s.includes('testnet')) {
-    if (s.includes('arb')) return 'arbitrum_sepolia';
-    if (s.includes('op') || s.includes('optimism')) return 'optimism_sepolia';
-    if (s.includes('base')) return 'base_sepolia';
-    if (s.includes('poly') || s.includes('matic')) return 'polygon_amoy';
+    // 1. SEPOLIA TESTNET LOGIC
+    if (s.includes('sepolia') || s.includes('testnet')) {
+        if (s.includes('arb')) return 'arbitrum_sepolia';
+        if (s.includes('op') || s.includes('optimism')) return 'optimism_sepolia';
+        if (s.includes('base')) return 'base_sepolia';
+        if (s.includes('poly') || s.includes('matic')) return 'polygon_amoy';
 
-    // 🛑 User Request: Default to ETH Sepolia if no specific chain is found
-    return 'ethereum_sepolia';
-}
+        // 🛑 User Request: Default to ETH Sepolia if no specific chain is found
+        return 'ethereum_sepolia';
+    }
 
-// 2. MAINNET LOGIC
-if (s.includes('arb')) return 'arbitrum';
-if (s.includes('op') || s.includes('optimism')) return 'optimism';
-if (s.includes('base')) return 'base';
-if (s.includes('poly') || s.includes('matic')) return 'polygon';
-if (s.includes('bsc') || s.includes('binance')) return 'bsc';
+    // 2. MAINNET LOGIC
+    if (s.includes('arb')) return 'arbitrum';
+    if (s.includes('op') || s.includes('optimism')) return 'optimism';
+    if (s.includes('base')) return 'base';
+    if (s.includes('poly') || s.includes('matic')) return 'polygon';
+    if (s.includes('bsc') || s.includes('binance')) return 'bsc';
 
-// Default
-return 'ethereum';
+    // Default
+    return 'ethereum';
 }
 
 
@@ -899,9 +901,22 @@ async function runGatekeeper(rule, user_data, modelIndex = 0) {
                 }
 
                 if (call.name === 'check_discord_membership') {
+                    // 1. Inject the User ID from the frontend (OAuth result)
                     if (!toolArgs.userId) toolArgs.userId = user_data.discordId;
-                    // Default to your Hackathon Server ID if not provided
-                    if (!toolArgs.guildId) toolArgs.guildId = "YOUR_DISCORD_SERVER_ID";
+
+                    // 2. Resolve Server ID (Guild ID)
+                    if (!toolArgs.guildId) {
+                        // A. SMART CHECK: Look for a 17-19 digit ID in the rule text
+                        const idMatch = rule.match(/\b\d{17,19}\b/);
+
+                        if (idMatch) {
+                            toolArgs.guildId = idMatch[0];
+                        } else {
+                            // B. FALLBACK: Use your main Hackathon Server ID
+                            // 👇 PASTE YOUR ACTUAL SERVER ID HERE
+                            toolArgs.guildId = "1322709977826529321";
+                        }
+                    }
                 }
 
                 // Execute Tool
@@ -1046,12 +1061,6 @@ app.post('/api/claim', async (req, res) => {
                 console.error("⚠️ Biometric Parse Failed:", e.message);
                 throw new Error("Invalid Passkey Signature Format");
             }
-        } else {
-            // FALLBACK: Mock Mode (for testing without a phone)
-            // We send 64 bytes of zeros to pass the 'E15' length check in Rust
-            console.log("🎭 No Biometrics provided. Using Dummy Data (Mock Mode).");
-            bioSigArray = Array(64).fill(0);
-            bioHashArray = Array(32).fill(0);
         }
 
         // ---------------------------------------------------------
@@ -1149,6 +1158,62 @@ app.get('/api/check-claim/:dropId', async (req, res) => {
 
 // --- START SERVER ---
 const SERVER_PORT = process.env.PORT || 4000;
+// --- NEW: DISCORD OAUTH ROUTES ---
+
+// 1. Redirect user to Discord
+app.get('/api/auth/discord', (req, res) => {
+    const scope = 'identify'; // We only need their ID/Username
+    const url = `https://discord.com/api/oauth2/authorize?client_id=${process.env.DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.DISCORD_REDIRECT_URI)}&response_type=code&scope=${scope}`;
+    res.redirect(url);
+});
+
+// 2. Handle Callback & Return User Data to Popup
+app.get('/api/auth/discord/callback', async (req, res) => {
+    const { code } = req.query;
+    if (!code) return res.send('No code provided');
+
+    try {
+        // A. Exchange Code for Access Token
+        const tokenResponse = await axios.post(
+            'https://discord.com/api/oauth2/token',
+            new URLSearchParams({
+                client_id: process.env.DISCORD_CLIENT_ID,
+                client_secret: process.env.DISCORD_CLIENT_SECRET,
+                grant_type: 'authorization_code',
+                code: code.toString(),
+                redirect_uri: process.env.DISCORD_REDIRECT_URI,
+            }),
+            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+
+        const { access_token } = tokenResponse.data;
+
+        // B. Get User Profile
+        const userResponse = await axios.get('https://discord.com/api/users/@me', {
+            headers: { Authorization: `Bearer ${access_token}` },
+        });
+
+        const userData = userResponse.data; // Contains id, username, discriminator
+
+        // C. Send Data back to Frontend (Popup) and Close
+        const html = `
+            <html>
+                <body>
+                    <script>
+                        window.opener.postMessage({ type: 'DISCORD_CONNECTED', user: ${JSON.stringify(userData)} }, '*');
+                        window.close();
+                    </script>
+                    <h1>Authentication Successful. You can close this window.</h1>
+                </body>
+            </html>
+        `;
+        res.send(html);
+
+    } catch (e) {
+        console.error("Discord Auth Error:", e.response?.data || e.message);
+        res.status(500).send("Authentication Failed");
+    }
+});
 app.listen(SERVER_PORT, () => {
     console.log(`\n🚀 StylusLink Gatekeeper Active`);
     console.log(`   📡 Port: ${SERVER_PORT}`);

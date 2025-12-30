@@ -1,3 +1,5 @@
 node_modules/
 frontend/node_modules/
 gatekeeper-api/node_modules/
+.env
+key.txt
