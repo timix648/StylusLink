@@ -1,0 +1,32 @@
+[package]
+name = "stylus-link-vault"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# 1. Stable SDK
+stylus-sdk = "=0.5.1"
+
+# 2. Stable Alloy (Matches SDK 0.5.1)
+alloy-primitives = { version = "=0.7.6", default-features = false }
+alloy-sol-types = { version = "=0.7.6", default-features = false }
+
+# 3. THE SECRET SAUCE: Manually pin the 'invisible' dependency
+# This prevents it from auto-updating to the broken 1.17.0 version
+ruint = { version = "=1.12.3", default-features = false }
+
+# 4. Allocator
+mini-alloc = "0.4.2"
+
+[features]
+export-abi = ["stylus-sdk/export-abi"]
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[profile.release]
+codegen-units = 1
+strip = true
+lto = true
+panic = "abort"
+opt-level = "z"
