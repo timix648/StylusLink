@@ -54,34 +54,38 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // --- 2. EVENT LISTENERS (Race Condition Fix) ---
+// --- 2. EVENT LISTENERS (Smart Polling Fix) ---
   useEffect(() => {
     const init = async () => {
-      // ⏳ WAIT 500ms for MetaMask to inject itself (Vercel Fix)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // 🔄 RETRY LOOP: Check for MetaMask every 100ms (up to 3 seconds)
+      let retries = 0;
+      while (retries < 30) {
+        if ((window as any).ethereum) break; // Found it! Stop waiting.
+        await new Promise(resolve => setTimeout(resolve, 100));
+        retries++;
+      }
 
       const { ethereum } = window as any;
       if (ethereum) {
+        console.log(`MetaMask found after ${retries * 100}ms`);
         const accounts = await ethereum.request({ method: 'eth_accounts' });
         await updateAuth(accounts);
 
-        // Setup listeners (MOVED INSIDE HERE TO WAIT FOR DELAY)
         ethereum.on('accountsChanged', updateAuth);
         ethereum.on('chainChanged', () => window.location.reload());
       } else {
-        console.log("MetaMask not found after wait");
+        console.log("MetaMask not found after 3 seconds.");
       }
       setIsLoading(false);
     };
 
     init();
 
-    // Cleanup listeners on unmount
     return () => {
-      const { ethereum } = window as any;
-      if (ethereum && ethereum.removeListener) {
-        ethereum.removeListener('accountsChanged', updateAuth);
-      }
+        const { ethereum } = window as any;
+        if (ethereum && ethereum.removeListener) {
+            ethereum.removeListener('accountsChanged', updateAuth);
+        }
     };
   }, [updateAuth]);
 
