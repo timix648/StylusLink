@@ -21,7 +21,7 @@ import QuestCard from '../components/QuestCard';
 import QuestDrawer from '../components/QuestDrawer';
 import { useWallet } from '../components/WalletContext';
 
-const API_URL = process.env.NEXT_PUBLIC_GATEKEEPER_URL || "http://localhost:4000/api";
+const API_URL = "https://ranchlike-mark-nonbookishly.ngrok-free.dev/api";
 
 // --- HELPER: Hex Conversion ---
 function bufferToHex(buffer: ArrayBuffer): string {

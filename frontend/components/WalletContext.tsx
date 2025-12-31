@@ -19,7 +19,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-// --- 1. CORE UPDATE LOGIC ---
+  // --- 1. CORE UPDATE LOGIC ---
   const updateAuth = useCallback(async (accounts: string[]) => {
     if (typeof window === 'undefined') return;
     const { ethereum } = window as any;
@@ -33,9 +33,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       try {
         const browserProvider = new ethers.BrowserProvider(ethereum);
         const newSigner = await browserProvider.getSigner();
-        
+
         console.log("Wallet Active:", newSigner.address);
-        
+
         setProvider(browserProvider);
         setSigner(newSigner);
         setAccount(newSigner.address);
@@ -54,39 +54,34 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // --- 2. EVENT LISTENERS (The Fix for your Issue) ---
+  // --- 2. EVENT LISTENERS (Race Condition Fix) ---
   useEffect(() => {
-    const { ethereum } = window as any;
-    
-    // Initial Check on Load
     const init = async () => {
+      // ⏳ WAIT 500ms for MetaMask to inject itself (Vercel Fix)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const { ethereum } = window as any;
       if (ethereum) {
         const accounts = await ethereum.request({ method: 'eth_accounts' });
         await updateAuth(accounts);
+
+        // Setup listeners (MOVED INSIDE HERE TO WAIT FOR DELAY)
+        ethereum.on('accountsChanged', updateAuth);
+        ethereum.on('chainChanged', () => window.location.reload());
+      } else {
+        console.log("MetaMask not found after wait");
       }
       setIsLoading(false);
     };
 
     init();
 
-    // 🚨 LISTENER: Detects when you switch accounts in MetaMask
-    if (ethereum) {
-        ethereum.on('accountsChanged', (accounts: string[]) => {
-            updateAuth(accounts);
-        });
-
-        // 🚨 LISTENER: Detects network changes (Reloads page to avoid state bugs)
-        ethereum.on('chainChanged', () => {
-            window.location.reload();
-        });
-    }
-
     // Cleanup listeners on unmount
     return () => {
-        if (ethereum && ethereum.removeListener) {
-            ethereum.removeListener('accountsChanged', updateAuth);
-            ethereum.removeListener('chainChanged', () => {}); 
-        }
+      const { ethereum } = window as any;
+      if (ethereum && ethereum.removeListener) {
+        ethereum.removeListener('accountsChanged', updateAuth);
+      }
     };
   }, [updateAuth]);
 
@@ -102,19 +97,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
       setIsLoading(true);
 
-      // (Network switching logic remains the same...)
+      // (Network switching logic)
       try {
         await ethereum.request({
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: '0x66eee' }], // 421614
         });
       } catch (switchError: any) {
-        // ... (Add chain logic remains the same)
+         // Ignore switch errors
       }
 
       // Request Account Access
       const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-      
+
       // ADDED: Set the persistence flag so updateAuth allows the connection
       localStorage.setItem('isWalletConnected', 'true');
 
