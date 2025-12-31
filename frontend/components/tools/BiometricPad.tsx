@@ -38,7 +38,7 @@ export const BiometricPad = ({ dropId, challenge, receiverAddress, onSuccess }: 
   const performSigning = async (challengeBuffer: Uint8Array, allowList: PublicKeyCredentialDescriptor[] = []): Promise<any> => {
     const credential = await navigator.credentials.get({
       publicKey: {
-        challenge: challengeBuffer,
+        challenge: challengeBuffer as any,
         rpId: window.location.hostname,
         userVerification: "required",
         allowCredentials: allowList,
