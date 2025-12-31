@@ -11,7 +11,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { BiometricPad } from './tools/BiometricPad';
 
-const API_URL = process.env.NEXT_PUBLIC_GATEKEEPER_URL || "https://probable-eureka-5gqr7qv9wx75c75r7-4000.app.github.dev/api";
+const API_URL = process.env.NEXT_PUBLIC_GATEKEEPER_URL || "http://localhost:4000/api";
 
 interface QuestCardProps {
     rule: string;

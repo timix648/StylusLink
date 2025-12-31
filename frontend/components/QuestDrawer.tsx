@@ -6,7 +6,7 @@ import { X, Clock, RefreshCcw, Trash2, ExternalLink, ArrowRight, Trophy, Loader2
 import { useWallet } from './WalletContext';
 
 const CONTRACT_ADDRESS = "0x56cc9af512f046ceff9e24ed8fe50fccf840b701";
-const API_URL = process.env.NEXT_PUBLIC_GATEKEEPER_URL || "https://probable-eureka-5gqr7qv9wx75c75r7-4000.app.github.dev/api";
+const API_URL = process.env.NEXT_PUBLIC_GATEKEEPER_URL || "http://localhost:4000/api";
 
 interface QuestDrawerProps {
   isOpen: boolean;

@@ -12,7 +12,7 @@ const app = express();
 
 // ✅ FIX: PERMISSIVE CORS CONFIGURATION
 app.use(cors({
-    origin: ['https://probable-eureka-5gqr7qv9wx75c75r7-3001.app.github.dev'],
+    origin: ['http://localhost:3001'],
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));

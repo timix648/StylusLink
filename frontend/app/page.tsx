@@ -21,7 +21,7 @@ import QuestCard from '../components/QuestCard';
 import QuestDrawer from '../components/QuestDrawer';
 import { useWallet } from '../components/WalletContext';
 
-const API_URL = process.env.NEXT_PUBLIC_GATEKEEPER_URL || "https://probable-eureka-5gqr7qv9wx75c75r7-4000.app.github.dev/api";
+const API_URL = process.env.NEXT_PUBLIC_GATEKEEPER_URL || "http://localhost:4000/api";
 
 // --- HELPER: Hex Conversion ---
 function bufferToHex(buffer: ArrayBuffer): string {
@@ -77,6 +77,12 @@ function GatekeeperApp() {
                     setClaimStep('claimed_already');
                     return; // ⛔ STOP HERE. Do not proceed to 'quest'.
                 }
+
+                // if (!data.active) {
+                //setIsClaimed(true);
+                //setClaimStep('claimed_already');
+                //return; 
+                //}
 
                 // ✅ ONLY if Active AND currently loading, we show the quest
                 if (claimStep === 'loading' && !urlProof) {
