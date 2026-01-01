@@ -11,7 +11,7 @@ export default function Navbar() {
         {/* Logo */}
         <div className="flex items-center gap-2">
           <video 
-            src="/logo.gif.mp4" 
+            src="/logo.gif.mp4?v=2" 
             autoPlay 
             loop 
             muted 
