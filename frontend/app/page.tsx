@@ -110,7 +110,15 @@ function GatekeeperApp() {
                     return;
                 }
 
-                // Only transition to the quest view if we were loading
+                // Mobile Handoff: If we have a proof token from QR code, skip quest
+                if (urlProof && claimStep === 'loading') {
+                    console.log('📱 Mobile handoff detected - skipping to biometrics');
+                    setProofToken(urlProof);
+                    setClaimStep('method'); // Show device selection
+                    return;
+                }
+
+                // Desktop Flow: Show quest if no proof token
                 if (claimStep === 'loading' && !urlProof) {
                     setClaimStep('quest');
                 }
@@ -129,8 +137,6 @@ function GatekeeperApp() {
 
         // Poll every 3 seconds to auto-close if it expires while they are looking at it
         const interval = setInterval(checkStatus, 3000);
-
-        // ... (Mobile Handoff logic remains here) ...
 
         return () => clearInterval(interval);
     }, [dropId, urlProof, claimStep]);

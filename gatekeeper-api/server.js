@@ -19,31 +19,26 @@ const ALLOWED_ORIGINS = [
     /styluslink.*\.vercel\.app$/
 ];
 
-app.use(cors({
-    origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps, Postman, or curl)
-        if (!origin) return callback(null, true);
-        
-        // Check if origin matches any allowed pattern
-        const allowed = ALLOWED_ORIGINS.some(pattern => {
-            if (pattern instanceof RegExp) return pattern.test(origin);
-            return pattern === origin;
-        });
-        
-        if (allowed) {
-            callback(null, true);
-        } else {
-            console.log('CORS blocked origin:', origin);
-            callback(null, true); // Allow all for hackathon - in production, use: callback(new Error('Not allowed by CORS'))
-        }
-    },
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'],
-    credentials: true
-}));
-
-// Handle preflight for all routes (Express 5+ syntax)
-app.options('/{*path}', cors());
+// Set CORS headers on ALL responses (critical for ngrok)
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    
+    // Allow all Vercel domains and localhost
+    if (!origin || origin.includes('vercel.app') || origin.includes('localhost')) {
+        res.setHeader('Access-Control-Allow-Origin', origin || '*');
+    }
+    
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, ngrok-skip-browser-warning');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    
+    // Handle preflight
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
+    next();
+});
 
 app.use(express.json());
 
