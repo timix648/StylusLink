@@ -312,7 +312,12 @@ function GatekeeperApp() {
                                     dropId={dropId}
                                     onVerificationComplete={(token) => {
                                         setProofToken(token);
-                                        setClaimStep('method'); // Move to Step 2
+                                        // If already on mobile (came via QR), skip method selection and go straight to biometrics
+                                        if (isMobile) {
+                                            setClaimStep('bio_check');
+                                        } else {
+                                            setClaimStep('method'); // Desktop: show method selection
+                                        }
                                     }}
                                 />
                             </motion.div>
