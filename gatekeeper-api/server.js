@@ -10,12 +10,40 @@ const crypto = require('crypto');
 const verifiedSessions = new Map();
 const app = express();
 
-// ✅ FIX: PERMISSIVE CORS CONFIGURATION
+// ✅ FIX: PERMISSIVE CORS CONFIGURATION FOR VERCEL + LOCAL DEV
+const ALLOWED_ORIGINS = [
+    'http://localhost:3001',
+    'http://localhost:3000',
+    // Add your Vercel domains here:
+    /\.vercel\.app$/,
+    /styluslink.*\.vercel\.app$/
+];
+
 app.use(cors({
-    origin: ['http://localhost:3001'],
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps, Postman, or curl)
+        if (!origin) return callback(null, true);
+        
+        // Check if origin matches any allowed pattern
+        const allowed = ALLOWED_ORIGINS.some(pattern => {
+            if (pattern instanceof RegExp) return pattern.test(origin);
+            return pattern === origin;
+        });
+        
+        if (allowed) {
+            callback(null, true);
+        } else {
+            console.log('CORS blocked origin:', origin);
+            callback(null, true); // Allow all for hackathon - in production, use: callback(new Error('Not allowed by CORS'))
+        }
+    },
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning'],
+    credentials: true
 }));
+
+// Handle preflight for all routes
+app.options('*', cors());
 
 app.use(express.json());
 

@@ -131,9 +131,12 @@ export const BiometricPad = ({ dropId, challenge, receiverAddress, onSuccess }: 
         }
       };
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_GATEKEEPER_URL}/api/claim`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_GATEKEEPER_URL}/claim`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': '1'
+        },
         body: JSON.stringify(payload)
       });
 

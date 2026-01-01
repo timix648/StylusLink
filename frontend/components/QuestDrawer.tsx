@@ -40,7 +40,9 @@ export default function QuestDrawer({ isOpen, onClose }: QuestDrawerProps) {
           if (q.status === 'reclaimed') return q;
           
           try {
-              const res = await fetch(`${API_URL}/check-claim/${q.id}`);
+              const res = await fetch(`${API_URL}/check-claim/${q.id}`, {
+                  headers: { 'ngrok-skip-browser-warning': '1' }
+              });
               const data = await res.json();
               
               if (data.reclaimed) return { ...q, status: 'reclaimed' };

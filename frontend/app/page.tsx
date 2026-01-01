@@ -21,7 +21,7 @@ import QuestCard from '../components/QuestCard';
 import QuestDrawer from '../components/QuestDrawer';
 import { useWallet } from '../components/WalletContext';
 
-const API_URL = "https://ranchlike-mark-nonbookishly.ngrok-free.dev/api";
+const API_URL = process.env.NEXT_PUBLIC_GATEKEEPER_URL || "http://localhost:4000/api";
 
 // --- HELPER: Hex Conversion ---
 function bufferToHex(buffer: ArrayBuffer): string {
@@ -67,7 +67,9 @@ function GatekeeperApp() {
 
         const checkStatus = async () => {
             try {
-                const res = await fetch(`${API_URL}/check-claim/${dropId}`);
+                const res = await fetch(`${API_URL}/check-claim/${dropId}`, {
+                    headers: { 'ngrok-skip-browser-warning': '1' }
+                });
                 const data = await res.json();
 
                 // 🛑 STRICT GATEKEEPING
@@ -174,6 +176,8 @@ function GatekeeperApp() {
                     mock: true,
                     signature: "0x30440220000000000000000000000000000000000000000000000000000000000000000102200000000000000000000000000000000000000000000000000000000000000001"
                 }
+            }, {
+                headers: { 'ngrok-skip-browser-warning': '1' }
             });
 
             if (res.data.success) {

@@ -127,7 +127,9 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
 
         const interval = setInterval(async () => {
             try {
-                const res = await fetch(`${API_URL}/check-claim/${dropId}`);
+                const res = await fetch(`${API_URL}/check-claim/${dropId}`, {
+                    headers: { 'ngrok-skip-browser-warning': '1' }
+                });
                 const data = await res.json();
                 if (data.claimed) {
                     setViewState('completed');
@@ -166,7 +168,10 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
             // API CALL
             const res = await fetch(`${API_URL}/verify`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'ngrok-skip-browser-warning': '1'
+                },
                 body: JSON.stringify({
                     rule, dropId,
                     user_data: {
