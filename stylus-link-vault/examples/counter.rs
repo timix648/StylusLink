@@ -1,9 +1,3 @@
-//! Example on how to interact with a deployed `stylus-hello-world` contract using defaults.
-//! This example uses ethers-rs to instantiate the contract using a Solidity ABI.
-//! Then, it attempts to check the current counter value, increment it via a tx,
-//! and check the value again. The deployed contract is fully written in Rust and compiled to WASM
-//! but with Stylus, it is accessible just as a normal Solidity smart contract is via an ABI.
-
 use dotenv::dotenv;
 use ethers::{
     middleware::SignerMiddleware,
@@ -16,14 +10,8 @@ use eyre::eyre;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::sync::Arc;
-
-/// Your private key file path.
 const PRIV_KEY_PATH: &str = "PRIV_KEY_PATH";
-
-/// Stylus RPC endpoint url.
 const RPC_URL: &str = "RPC_URL";
-
-/// Deployed pragram address.
 const STYLUS_CONTRACT_ADDRESS: &str = "STYLUS_CONTRACT_ADDRESS";
 
 #[tokio::main]

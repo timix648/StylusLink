@@ -9,7 +9,6 @@ import {
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// --- CONFIGURATION ---
 const CONTRACT_ADDRESS = "0x56cc9af512f046ceff9e24ed8fe50fccf840b701";
 const RELAYER_ADDRESS = "0x23482038d27934F69FC28753C255769e57803D90";
 
@@ -27,11 +26,8 @@ export default function CreateDrop() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [copied, setCopied] = useState(false);
-
-  // About Menu State
   const [showAbout, setShowAbout] = useState(false);
 
-  // --- HELPER: Save to Local Storage ---
   const saveQuestToHistory = (id: string, rule: string, ethAmount: string, expiry: number) => {
     const newQuest = {
       id, rule, amount: ethAmount, type: questType,
@@ -41,7 +37,6 @@ export default function CreateDrop() {
     localStorage.setItem('my_quests', JSON.stringify([newQuest, ...existing]));
   };
 
-  // --- HELPER: P-256 Key Gen ---
   const generateP256Keys = async () => {
     const keyPair = await window.crypto.subtle.generateKey(
       { name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]
@@ -59,7 +54,6 @@ export default function CreateDrop() {
     return { pubKeyX: toHex(jwk.x!), pubKeyY: toHex(jwk.y!) };
   };
 
-  // --- MAIN ACTION: Create Drop ---
   const handleCreate = async () => {
     if (!signer || !account) return alert("Please Connect Wallet");
     if (!rule) return alert("Please enter a rule");
@@ -94,8 +88,6 @@ export default function CreateDrop() {
         );
         
         await tx.wait();
-
-        // LOGIC FOR MODES
         let linkType = 'input'; 
         if (questType === 'KNOWLEDGE') linkType = 'input';
         else if (questType === 'IDENTITY') linkType = 'geo';
@@ -119,17 +111,13 @@ export default function CreateDrop() {
 
   return (
     <div className="w-full relative font-sans">
-      
-      {/* Background Ambient Glow */}
+ 
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-indigo-500/10 blur-[120px] rounded-full pointer-events-none" />
 
-      {/* GLASS CONTAINER */}
       <div className="bg-black/40 backdrop-blur-2xl border border-white/10 p-6 md:p-8 rounded-3xl shadow-2xl relative z-10 overflow-hidden">
-        
-        {/* Subtle Noise Texture */}
+
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
 
-        {/* HEADER */}
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/5">
             <div>
                 <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight flex items-center gap-2">
@@ -140,7 +128,7 @@ export default function CreateDrop() {
         </div>
 
         {generatedLink ? (
-          // --- SUCCESS VIEW (RECEIPT STYLE) ---
+          //SUCCESS VIEW
           <motion.div initial={{opacity:0, scale: 0.98}} animate={{opacity:1, scale:1}} className="text-center py-8">
             <div className="w-16 h-16 bg-gradient-to-tr from-green-500 to-emerald-600 rounded-full mx-auto flex items-center justify-center mb-5 shadow-lg shadow-green-500/20">
               <Check className="w-8 h-8 text-white" />
@@ -168,13 +156,10 @@ export default function CreateDrop() {
           </motion.div>
         ) : (
           
-          // --- COMPACT GRID LAYOUT ---
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
             
-            {/* LEFT COLUMN: SETTINGS (Span 5) */}
             <div className="md:col-span-5 space-y-5">
-                
-                {/* 1. Amount & Time */}
+ 
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">Reward (ETH)</label>
@@ -202,7 +187,6 @@ export default function CreateDrop() {
                     </div>
                 </div>
 
-                {/* 2. Quest Type Selection */}
                 <div>
                     <label className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest mb-2 block">Verification Mode</label>
                     <div className="space-y-2">
@@ -233,7 +217,6 @@ export default function CreateDrop() {
                 </div>
             </div>
 
-            {/* RIGHT COLUMN: RULE & ACTION (Span 7) */}
             <div className="md:col-span-7 flex flex-col h-full">
                 <label className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
                     AI Instructions (Prompt)
@@ -278,10 +261,8 @@ export default function CreateDrop() {
         )}
       </div>
 
-      {/* --- FLOATING ACTION MENU (Left Bottom) --- */}
       <div className="fixed bottom-6 left-6 z-50 flex flex-col-reverse items-start gap-3">
-        
-        {/* Toggle Button */}
+ 
         <button 
             onClick={() => setShowAbout(!showAbout)}
             className="group flex items-center gap-2 px-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-full text-white shadow-2xl hover:bg-white/10 transition-all hover:scale-105"
@@ -290,7 +271,6 @@ export default function CreateDrop() {
            {showAbout ? <ChevronDown className="w-3 h-3 text-zinc-400" /> : <ChevronUp className="w-3 h-3 text-zinc-400" />}
         </button>
 
-        {/* Expanded Menu */}
         <AnimatePresence>
             {showAbout && (
                 <motion.div 

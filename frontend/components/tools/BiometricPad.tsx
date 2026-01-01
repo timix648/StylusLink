@@ -10,7 +10,6 @@ interface BiometricPadProps {
   onSuccess: () => void;
 }
 
-// --- HELPER: Decode DER Signature (Fixes E15 Data Length) ---
 function decodeDERSignature(signature: Uint8Array): { r: Uint8Array; s: Uint8Array } {
   let offset = 2;
   const rLen = signature[offset + 1];
@@ -34,7 +33,6 @@ export const BiometricPad = ({ dropId, challenge, receiverAddress, onSuccess }: 
   const [status, setStatus] = useState<'idle' | 'scanning' | 'registering' | 'verifying' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // 1. Core Signing Logic
   const performSigning = async (challengeBuffer: Uint8Array, allowList: PublicKeyCredentialDescriptor[] = []): Promise<any> => {
     const credential = await navigator.credentials.get({
       publicKey: {
@@ -48,12 +46,10 @@ export const BiometricPad = ({ dropId, challenge, receiverAddress, onSuccess }: 
     return credential;
   };
 
-  // 2. Core Registration Logic
   const performRegistration = async (challengeBuffer: Uint8Array) => {
     setStatus('registering');
     return await navigator.credentials.create({
       publicKey: {
-        // TypeScript bypass
         challenge: challengeBuffer as any,
         rp: { name: "StylusLink Proof", id: window.location.hostname },
         user: {
@@ -83,8 +79,6 @@ export const BiometricPad = ({ dropId, challenge, receiverAddress, onSuccess }: 
     setErrorMsg('');
 
     try {
-      // 🚨 KEY FIX: WebAuthn requires the challenge to be base64url encoded often, 
-      // but here we stick to Buffer as per your setup.
       const challengeBuffer = Uint8Array.from(challenge, c => c.charCodeAt(0));
       let credential;
 
@@ -107,15 +101,9 @@ export const BiometricPad = ({ dropId, challenge, receiverAddress, onSuccess }: 
       const response = credential.response as AuthenticatorAssertionResponse;
       const signatureRaw = new Uint8Array(response.signature);
       const { r, s } = decodeDERSignature(signatureRaw);
-
-      // Combine to 64 bytes
       const compactSignature = new Uint8Array(64);
       compactSignature.set(r, 0);
       compactSignature.set(s, 32);
-
-      // 🚨 CRITICAL: The "message" being signed is NOT just the challenge.
-      // It is authenticatorData + sha256(clientDataJSON).
-      // We must send these raw components so the contract can verify exactly what was signed.
 
       const payload = {
         dropId,
@@ -123,8 +111,6 @@ export const BiometricPad = ({ dropId, challenge, receiverAddress, onSuccess }: 
         biometricData: {
           id: credential.id,
           signature: Array.from(compactSignature),
-
-          // Send these so the backend/contract can reconstruct the message
           authenticatorData: Array.from(new Uint8Array(response.authenticatorData)),
           clientDataJSON: Array.from(new Uint8Array(response.clientDataJSON)),
           challenge: challenge // Send original challenge string for verification
@@ -172,9 +158,9 @@ export const BiometricPad = ({ dropId, challenge, receiverAddress, onSuccess }: 
           }`}
       >
         {status === 'registering' ? (
-          <><span>👆 First Scan: Setup Secure ID...</span></>
+          <><span>First Scan: Setup Secure ID...</span></>
         ) : status === 'scanning' ? (
-          <><span>✌️ Second Scan: Confirm Claim</span></>
+          <><span>Second Scan: Confirm Claim</span></>
         ) : status === 'verifying' ? (
           <>Verifying Proof...</>
         ) : (

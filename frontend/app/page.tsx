@@ -8,14 +8,12 @@ import axios from 'axios';
 import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
 
-// ICONS
 import {
     ShieldCheck, Fingerprint, CheckCircle, ArrowRight,
     Smartphone, Laptop, Zap, Menu, Code2, ScanLine, Lock, Wallet, LogOut, ChevronRight
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
-// COMPONENTS
 import CreateDrop from '../components/CreateDrop';
 import QuestCard from '../components/QuestCard';
 import QuestDrawer from '../components/QuestDrawer';
@@ -23,7 +21,6 @@ import { useWallet } from '../components/WalletContext';
 
 const API_URL = process.env.NEXT_PUBLIC_GATEKEEPER_URL || "http://localhost:4000/api";
 
-// --- HELPER: Hex Conversion ---
 function bufferToHex(buffer: ArrayBuffer): string {
     return "0x" + Array.from(new Uint8Array(buffer))
         .map(b => b.toString(16).padStart(2, "0"))
@@ -32,21 +29,13 @@ function bufferToHex(buffer: ArrayBuffer): string {
 
 function GatekeeperApp() {
     const searchParams = useSearchParams();
-    const { width, height } = useWindowSize(); // For Confetti
-
-    // URL Params
+    const { width, height } = useWindowSize(); 
     const dropId = searchParams.get('id');
     const rule = searchParams.get('rule');
     const urlProof = searchParams.get('proof'); // If coming from mobile QR
-
-    // Context
     const { account, connectWallet, disconnectWallet } = useWallet();
-
-    // --- STATE ---
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
-
-    // CLAIM FLOW STATE
     const [claimStep, setClaimStep] = useState('loading');
     const [isClaimed, setIsClaimed] = useState(false);
     const [proofToken, setProofToken] = useState("");
@@ -54,19 +43,16 @@ function GatekeeperApp() {
     const [errorMsg, setErrorMsg] = useState("");
     const [isMobile, setIsMobile] = useState(false);
 
-    // Prevent hydration mismatch & Detect Mobile
     useEffect(() => {
         setMounted(true);
         setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
     }, []);
 
 
-    // --- 1. LOGIC: INITIAL CHECK & POLLING ---
     useEffect(() => {
         if (!dropId) return;
 
         const checkStatus = async () => {
-            // Prevent hanging by using an AbortController with a timeout
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 4000);
 
@@ -79,34 +65,27 @@ function GatekeeperApp() {
                 clearTimeout(timeout);
                 const data = await res.json();
 
-                console.log('📋 Backend response:', JSON.stringify(data));
-
-                // Support both response shapes:
-                // - { status: 'ACTIVE' }
-                // - { active: true }
+                console.log('Backend response:', JSON.stringify(data));
                 let isActive = false;
                 if (typeof data.active === 'boolean') {
                     isActive = data.active;
-                    console.log('✅ Using data.active:', isActive);
+                    console.log('Using data.active:', isActive);
                 } else if (typeof data.status !== 'undefined') {
                     isActive = data.status === 'ACTIVE';
-                    console.log('✅ Using data.status:', isActive);
+                    console.log('Using data.status:', isActive);
                 } else if (data.details && data.details.expiresAt) {
-                    // Fallback: check expiresAt timestamp (stringified BigInt)
                     try {
                         const expires = Number(data.details.expiresAt);
                         isActive = Date.now() / 1000 < expires;
-                        console.log('✅ Using expiresAt fallback:', isActive);
+                        console.log('Using expiresAt fallback:', isActive);
                     } catch (e) {
                         isActive = false;
                     }
                 }
 
-                console.log('🎯 Final isActive decision:', isActive);
-
-                // Don't interrupt the claim flow or success celebration!
+                console.log('Final isActive decision:', isActive);
                 if (claimStep === 'processing' || claimStep === 'success') {
-                    console.log('⏸️ Pausing status checks - user is claiming/celebrating');
+                    console.log('Pausing status checks - user is claiming/celebrating');
                     return;
                 }
 
@@ -116,44 +95,36 @@ function GatekeeperApp() {
                     return;
                 }
 
-                // Mobile Handoff: If we have a proof token from QR code, skip quest
                 if (urlProof && claimStep === 'loading') {
                     console.log('📱 Mobile handoff detected - skipping to biometrics');
                     setProofToken(urlProof);
-                    setClaimStep('bio_check'); // Skip method selection, go straight to biometrics
+                    setClaimStep('bio_check');
                     return;
                 }
-
-                // Desktop Flow: Show quest if no proof token
                 if (claimStep === 'loading' && !urlProof) {
                     setClaimStep('quest');
                 }
 
             } catch (e: any) {
                 console.error('Status check error:', e?.message || e);
-                // Don't hang the UI indefinitely — show the quest in offline/fallback mode
                 setErrorMsg('Unable to reach Gatekeeper; showing quest (offline check).');
                 if (claimStep === 'loading') setClaimStep('quest');
                 clearTimeout(timeout);
             }
         };
 
-        // Run immediately
         checkStatus();
 
-        // Poll every 3 seconds to auto-close if it expires while they are looking at it
         const interval = setInterval(checkStatus, 3000);
 
         return () => clearInterval(interval);
     }, [dropId, urlProof, claimStep]);
 
-
-    // --- 2. LOGIC: BIOMETRICS (The "Hard" Part) ---
     const handleBiometrics = async () => {
         setErrorMsg("");
 
         try {
-            // 1. Hardware Check
+    
             if (window.PublicKeyCredential) {
                 const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
                 if (!available) throw new Error("No Biometric Sensor Detected.");
@@ -161,7 +132,6 @@ function GatekeeperApp() {
                 throw new Error("WebAuthn not supported.");
             }
 
-            // 2. Trigger OS Prompt (FaceID / TouchID)
             const credential = await navigator.credentials.create({
                 publicKey: {
                     challenge: new Uint8Array([1, 2, 3, 4]),
@@ -180,11 +150,9 @@ function GatekeeperApp() {
                 }
             });
 
-            // 3. Success
             const realCredentialId = bufferToHex((credential as any).rawId);
-            console.log("🧬 BIO OK:", realCredentialId);
+            console.log("BIO OK:", realCredentialId);
 
-            // Move to Wallet Input (or Auto-Submit if wallet connected)
             if (account) {
                 setUserAddress(account);
                 setClaimStep('processing');
@@ -200,7 +168,6 @@ function GatekeeperApp() {
     };
 
 
-    // --- 3. LOGIC: SUBMISSION ---
     const submitClaim = async (addr: string) => {
         if (!ethers.isAddress(addr)) {
             setErrorMsg("Invalid Ethereum Address");
@@ -224,8 +191,7 @@ function GatekeeperApp() {
 
             if (res.data.success) {
                 setClaimStep('success');
-                
-                // After 5 seconds of celebration, show vault closed screen
+
                 setTimeout(() => {
                     setIsClaimed(true);
                     setClaimStep('claimed_already');
@@ -237,23 +203,17 @@ function GatekeeperApp() {
         } catch (e: any) {
             console.error("Claim Error:", e);
             setErrorMsg(e.response?.data?.error || "Claim Transaction Failed");
-            setClaimStep('wallet_input'); // Go back to let them try again
+            setClaimStep('wallet_input'); 
         }
     };
 
     if (!mounted) return <div className="bg-black min-h-screen" />;
-
-    // =========================================================
-    // 🔵 VIEW 1: CLAIM INTERFACE (The animated flow)
-    // =========================================================
     if (dropId && rule) {
         return (
             <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
 
-                {/* Confetti on Success */}
                 {claimStep === 'success' && <Confetti width={width} height={height} recycle={false} numberOfPieces={500} colors={['#6366f1', '#a855f7', '#ec4899']} />}
 
-                {/* Ambient Background */}
                 <div className="absolute inset-0 z-0">
                     <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-black to-black"></div>
                     <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full blur-[120px] transition-colors duration-1000
@@ -262,8 +222,6 @@ function GatekeeperApp() {
                 </div>
 
                 <div className="relative z-10 w-full max-w-lg">
-
-                    {/* HEADER */}
                     <div className="text-center mb-8">
                         <div className="inline-flex items-center justify-center w-12 h-12 bg-white/5 rounded-2xl border border-white/10 mb-4 shadow-xl">
                             <ShieldCheck className="w-6 h-6 text-indigo-400" />
@@ -288,9 +246,7 @@ function GatekeeperApp() {
                                 <p className="text-zinc-500 text-xs mt-2 font-mono">Verifying Expiry & Claim Status</p>
                             </motion.div>
                         )}
-                        {/* 🛑 END PASTE 🛑 */}
 
-                        {/* 1. CLAIMED ALREADY */}
                         {isClaimed && (
                             <motion.div key="claimed" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-black/40 backdrop-blur-xl border border-white/10 p-10 rounded-3xl text-center shadow-2xl">
                                 <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -304,7 +260,6 @@ function GatekeeperApp() {
                             </motion.div>
                         )}
 
-                        {/* 2. THE QUEST CARD (Step 1) */}
                         {claimStep === 'quest' && !isClaimed && (
                             <motion.div key="quest" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }}>
                                 <QuestCard
@@ -312,18 +267,16 @@ function GatekeeperApp() {
                                     dropId={dropId}
                                     onVerificationComplete={(token) => {
                                         setProofToken(token);
-                                        // If already on mobile (came via QR), skip method selection and go straight to biometrics
                                         if (isMobile) {
                                             setClaimStep('bio_check');
                                         } else {
-                                            setClaimStep('method'); // Desktop: show method selection
+                                            setClaimStep('method');
                                         }
                                     }}
                                 />
                             </motion.div>
                         )}
 
-                        {/* 3. METHOD SELECTION (Mobile vs Desktop) */}
                         {claimStep === 'method' && (
                             <motion.div key="method" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="bg-black/40 backdrop-blur-xl border border-white/10 p-8 rounded-3xl shadow-2xl">
                                 <div className="text-center mb-8">
@@ -351,7 +304,6 @@ function GatekeeperApp() {
                             </motion.div>
                         )}
 
-                        {/* 4. QR CODE (Mobile Handoff) */}
                         {claimStep === 'qr_show' && (
                             <motion.div key="qr" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="bg-black/40 backdrop-blur-xl border border-white/10 p-8 rounded-3xl text-center shadow-2xl">
                                 <h3 className="text-lg font-bold text-white mb-6">Scan with Phone</h3>
@@ -372,7 +324,6 @@ function GatekeeperApp() {
                             </motion.div>
                         )}
 
-                        {/* 5. BIOMETRIC CHECK (The Button) */}
                         {claimStep === 'bio_check' && (
                             <motion.div key="bio" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="bg-black/40 backdrop-blur-xl border border-white/10 p-8 rounded-3xl text-center shadow-2xl">
                                 <div className="w-20 h-20 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-indigo-500/20">
@@ -397,7 +348,6 @@ function GatekeeperApp() {
                             </motion.div>
                         )}
 
-                        {/* 6. WALLET INPUT (If not connected) */}
                         {claimStep === 'wallet_input' && (
                             <motion.div key="wallet" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="bg-black/40 backdrop-blur-xl border border-white/10 p-8 rounded-3xl text-center shadow-2xl">
                                 <div className="w-16 h-16 bg-green-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-green-500/20">
@@ -424,7 +374,6 @@ function GatekeeperApp() {
                             </motion.div>
                         )}
 
-                        {/* 7. PROCESSING */}
                         {claimStep === 'processing' && (
                             <motion.div key="proc" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
                                 <div className="w-12 h-12 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
@@ -433,7 +382,6 @@ function GatekeeperApp() {
                             </motion.div>
                         )}
 
-                        {/* 8. SUCCESS */}
                         {claimStep === 'success' && (
                             <motion.div key="success" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-black/60 backdrop-blur-xl border border-white/10 p-10 rounded-3xl text-center shadow-2xl">
                                 <div className="w-20 h-20 bg-gradient-to-tr from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-900/40">
@@ -453,20 +401,15 @@ function GatekeeperApp() {
         );
     }
 
-    // =========================================================
-    // 🟣 VIEW 2: CREATOR DASHBOARD (PRODUCTION LAYOUT)
-    // =========================================================
     return (
         <div className="min-h-screen bg-black text-white relative flex flex-col font-sans selection:bg-indigo-500/30 overflow-x-hidden">
 
-            {/* Background Ambient Orbs */}
             <div className="fixed inset-0 z-0 pointer-events-none">
                 <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,#1e1b4b,transparent_50%)]"></div>
                 <div className="absolute top-[20%] right-[10%] w-[500px] h-[500px] bg-purple-900/10 rounded-full blur-[128px]"></div>
                 <div className="absolute bottom-[10%] left-[10%] w-[400px] h-[400px] bg-indigo-900/10 rounded-full blur-[100px]"></div>
             </div>
 
-            {/* 1. NAVBAR */}
             <nav className="relative z-50 flex items-center justify-between px-6 md:px-12 py-6 w-full max-w-7xl mx-auto">
                 <a href="/about" className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
                     <img
@@ -480,7 +423,6 @@ function GatekeeperApp() {
                     </div>
                 </a>
 
-                {/* Wallet Connection */}
                 <div>
                     {!account ? (
                         <button onClick={connectWallet} className="flex items-center gap-2 px-5 py-2.5 bg-white text-black font-bold text-sm rounded-full hover:bg-zinc-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)]">
@@ -502,7 +444,6 @@ function GatekeeperApp() {
                 </div>
             </nav>
 
-            {/* 2. MAIN CONTENT */}
             <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 md:px-6 w-full pb-20 pt-10">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -513,7 +454,6 @@ function GatekeeperApp() {
                 </motion.div>
             </main>
 
-            {/* 3. YOUR QUESTS BUTTON (Bottom Right - Matching Style) */}
             <div className="fixed bottom-6 right-6 z-50">
                 <button
                     onClick={() => setIsDrawerOpen(true)}

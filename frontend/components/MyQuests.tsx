@@ -19,7 +19,6 @@ export default function MyQuests() {
     if (saved) {
         const parsed = JSON.parse(saved);
         setQuests(parsed);
-        // Check claim status for all quests
         parsed.forEach((quest: any) => checkClaimStatus(quest.id));
     }
   }, []);
@@ -53,7 +52,6 @@ export default function MyQuests() {
         
         alert("Funds Reclaimed Successfully!");
         
-        // Remove from list or mark as reclaimed
         const updated = quests.map(q => q.id === dropId ? {...q, status: 'reclaimed'} : q);
         setQuests(updated);
         localStorage.setItem('my_quests', JSON.stringify(updated));
@@ -105,7 +103,6 @@ export default function MyQuests() {
                 </div>
             </div>
 
-            {/* Show Claim Details if Claimed */}
             {isClaimed && claimStatus && (
               <div className="bg-green-500/5 border border-green-500/20 p-3 rounded-lg">
                 <p className="text-xs text-green-400 mb-2 font-bold">✓ Quest Completed</p>

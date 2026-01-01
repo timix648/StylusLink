@@ -20,7 +20,6 @@ export default function QuestDrawer({ isOpen, onClose }: QuestDrawerProps) {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  // --- 1. LOAD & SYNC STATUS ---
   useEffect(() => {
     if (isOpen) {
       loadAndSyncQuests();
@@ -33,10 +32,7 @@ export default function QuestDrawer({ isOpen, onClose }: QuestDrawerProps) {
       if (!saved) { setSyncing(false); return; }
 
       let parsed = JSON.parse(saved);
-
-      // Check API for updates on Active quests
       const updatedQuests = await Promise.all(parsed.map(async (q: any) => {
-          // If already reclaimed or known claimed, skip fetch to save bandwidth
           if (q.status === 'reclaimed') return q;
           
           try {
@@ -54,7 +50,6 @@ export default function QuestDrawer({ isOpen, onClose }: QuestDrawerProps) {
           }
       }));
 
-      // Sort: Active first, then Claimed, then Reclaimed/Expired
       updatedQuests.sort((a, b) => b.createdAt - a.createdAt);
       
       setQuests(updatedQuests);
@@ -62,7 +57,6 @@ export default function QuestDrawer({ isOpen, onClose }: QuestDrawerProps) {
       setSyncing(false);
   };
 
-  // --- 2. RECLAIM LOGIC ---
   const handleReclaim = async (dropId: string) => {
     if (!signer) return alert("Please connect wallet");
     setLoading(true);
@@ -121,14 +115,12 @@ export default function QuestDrawer({ isOpen, onClose }: QuestDrawerProps) {
 
             <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
                 {selectedQuest ? (
-                    // --- DETAIL VIEW ---
                     <div className="space-y-6 animate-in slide-in-from-right-4">
                         <button onClick={() => setSelectedQuest(null)} className="text-sm text-zinc-500 hover:text-white flex items-center gap-2">
                             ← Back to list
                         </button>
 
                         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 relative overflow-hidden">
-                            {/* Visual Status Indicator */}
                             {selectedQuest.status === 'claimed' && (
                                 <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500" />
                             )}
@@ -193,11 +185,11 @@ export default function QuestDrawer({ isOpen, onClose }: QuestDrawerProps) {
                         </div>
                     </div>
                 ) : (
-                    // --- LIST VIEW ---
+                    
                     <div className="space-y-3">
                         {quests.map((q) => {
                             const timeStatus = getTimeStatus(q.expiresAt);
-                            // 🟣 PURPLE/BLUE GLOW IF CLAIMED 🟣
+                         
                             const isClaimed = q.status === 'claimed';
                             
                             return (

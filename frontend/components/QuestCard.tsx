@@ -19,7 +19,6 @@ interface QuestCardProps {
     onVerificationComplete?: (token: string) => void;
 }
 
-// 🧠 MODE DETECTOR
 function getQuestMode(rule: string, typeParam: string | null) {
     const r = rule.toLowerCase();
     if (r.includes('discord') || r.includes('twitter') || r.includes('follow') || r.includes('follows') || r.includes('followers') || r.includes('youtube') || r.includes('role') || r.includes('username') || r.includes('handle')) {
@@ -34,12 +33,10 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
     const searchParams = useSearchParams();
     const questType = searchParams.get('type');
     const modeParam = searchParams.get('mode');
-
-    // 🚨 ENSURE WalletContext EXPORTS disconnectWallet
     const { account, connectWallet, disconnectWallet } = useWallet();
     const currentMode = getQuestMode(rule, questType);
 
-    // --- STATE MACHINE ---
+    // STATE MACHINE
     const [viewState, setViewState] = useState<'intro' | 'checking' | 'success_logic' | 'method_select' | 'scanning_qr' | 'biometric_pad' | 'completed' | 'mobile_geo_landing'>('intro');
 
     const [discordUser, setDiscordUser] = useState<{ id: string, username: string } | null>(null);
@@ -48,7 +45,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
     const [errorMsg, setErrorMsg] = useState('');
     const [hasBioHardware, setHasBioHardware] = useState(false);
 
-    // 1. Check for Biometric Hardware on Mount
     useEffect(() => {
         if (typeof window !== 'undefined' && window.PublicKeyCredential) {
             PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
@@ -57,7 +53,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
         }
     }, []);
 
-    // 2. 🚨 PRIVACY FIX: NUCLEAR DISCONNECT ON MOUNT
     useEffect(() => {
         if (disconnectWallet) disconnectWallet();
         if (typeof window !== 'undefined') {
@@ -66,7 +61,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
     }, []); // Runs once on mount
 
     const handleDiscordLogin = () => {
-        // Open the backend auth route in a popup
         const width = 500, height = 700;
         const left = (window.innerWidth - width) / 2;
         const top = (window.innerHeight - height) / 2;
@@ -77,11 +71,10 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
             `width=${width},height=${height},top=${top},left=${left}`
         );
 
-        // Listen for the data sent back from server.js
         const messageHandler = (event: MessageEvent) => {
             if (event.data?.type === 'DISCORD_CONNECTED') {
                 setDiscordUser(event.data.user);
-                setInput("CONNECTED_VIA_OAUTH"); // Dummy value to enable the verify button
+                setInput("CONNECTED_VIA_OAUTH");
                 window.removeEventListener('message', messageHandler);
             }
         };
@@ -89,39 +82,32 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
         window.addEventListener('message', messageHandler);
     };
 
-    // 3. 🚨 CRITICAL FIX: FORCE WALLET SELECTION
     const handleForceConnect = async () => {
-        // 1. Clear internal state first
         if (disconnectWallet) disconnectWallet();
         if (typeof window !== 'undefined') localStorage.removeItem('isWalletConnected');
 
         if (typeof window !== 'undefined' && (window as any).ethereum) {
             try {
-                // 2. FORCE METAMASK TO REVOKE PERMISSIONS & SHOW SELECTION SCREEN
                 await (window as any).ethereum.request({
                     method: "wallet_requestPermissions",
                     params: [{ eth_accounts: {} }]
                 });
 
-                // 3. Now that permissions are reset, connect normally
                 await connectWallet();
             } catch (e) {
                 console.log("Wallet selection cancelled");
             }
         } else {
-            // Fallback for non-MetaMask environments
             connectWallet();
         }
     };
 
-    // 🚨 FIX: Intercept Mobile Geo Mode
     useEffect(() => {
         if (modeParam === 'geo_verify') {
             setViewState('mobile_geo_landing');
         }
     }, [modeParam]);
 
-    // Poll for Mobile Completion
     useEffect(() => {
         if (viewState !== 'scanning_qr') return;
 
@@ -141,8 +127,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
         return () => clearInterval(interval);
     }, [viewState, dropId]);
 
-
-    // MAIN LOGIC VERIFICATION
     const performVerify = useCallback(async (overrideInput?: string, overrideGeo?: { lat: number, lng: number }) => {
         setViewState('checking');
         setErrorMsg('');
@@ -150,8 +134,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
         try {
             let payloadInput = overrideInput || input;
             let geoData = overrideGeo || { lat: 0, lng: 0 };
-
-            // GEO MODE: FORCE GPS IF NOT PROVIDED
             if (currentMode === 'GEO' && !overrideGeo) {
                 try {
                     const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -165,10 +147,9 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                 }
             }
 
-            // API CALL
             const res = await fetch(`${API_URL}/verify`, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'ngrok-skip-browser-warning': '1'
                 },
@@ -177,7 +158,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                     user_data: {
                         address: account || "0x0000000000000000000000000000000000000000",
                         answer: payloadInput || "CHECK_CONDITION",
-                        // ✅ NEW: Send the OAuth Discord ID if available
                         discordId: discordUser ? discordUser.id : undefined,
                         latitude: geoData.lat,
                         longitude: geoData.lng
@@ -191,7 +171,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                 setProofToken(data.proofToken);
                 if (onVerificationComplete) onVerificationComplete(data.proofToken);
                 setViewState('success_logic');
-                // Short delay before showing success state
                 setTimeout(() => setViewState('method_select'), 1500);
             } else {
                 setErrorMsg(data.explanation || "Incorrect. Try again.");
@@ -205,7 +184,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
         }
     }, [account, rule, dropId, input, currentMode, onVerificationComplete, modeParam, discordUser]);
 
-    // --- RENDER HELPERS ---
     const headerIcon = {
         'TRIVIA': <Brain className="w-5 h-5 text-purple-400" />,
         'WALLET': <Wallet className="w-5 h-5 text-blue-400" />,
@@ -223,7 +201,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
         <div className="w-full max-w-md mx-auto relative perspective-1000">
             <AnimatePresence mode='wait'>
 
-                {/* --- MAIN CARD --- */}
                 <motion.div
                     key="card"
                     initial={{ opacity: 0, y: 20, rotateX: 10 }}
@@ -232,14 +209,12 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                     transition={{ type: "spring", stiffness: 200, damping: 20 }}
                     className="bg-white/5 border border-white/10 p-8 rounded-3xl shadow-2xl relative overflow-hidden backdrop-blur-2xl"
                 >
-                    {/* Background Glow */}
                     <div className={`absolute -top-20 -right-20 w-60 h-60 rounded-full blur-[100px] pointer-events-none transition-colors duration-500
                 ${viewState === 'completed' ? 'bg-green-500/20' :
                             viewState === 'scanning_qr' ? 'bg-blue-500/20' :
                                 'bg-purple-500/10'}`}
                     />
 
-                    {/* HEADER */}
                     <div className="flex items-center gap-4 mb-6 relative z-10 border-b border-white/5 pb-4">
                         <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center border border-white/5 shadow-inner">
                             {viewState === 'completed' ? <CheckCircle className="w-5 h-5 text-green-500" /> : headerIcon}
@@ -252,14 +227,12 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                         </div>
                     </div>
 
-                    {/* THE RULE */}
                     {viewState !== 'completed' && (
                         <div className="bg-black/20 p-4 rounded-xl border border-white/5 mb-6 font-sans text-sm text-zinc-300 leading-relaxed backdrop-blur-sm">
                             {rule}
                         </div>
                     )}
 
-                    {/* ERROR BANNER */}
                     {errorMsg && (
                         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="mb-4 overflow-hidden">
                             <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2">
@@ -269,18 +242,12 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                         </motion.div>
                     )}
 
-
-                    {/* =====================================================================================
-                     STATE: INTRO (The Entry Point) 
-                    ===================================================================================== */}
                     {viewState === 'intro' && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
 
-                            {/* TRIVIA & DISCORD LOGIC */}
                             {currentMode === 'TRIVIA' && (
                                 <div className="space-y-4">
 
-                                    {/* A. DISCORD BUTTON MODE */}
                                     {rule.toLowerCase().includes('discord') ? (
                                         <div className="flex flex-col gap-3">
                                             {!discordUser ? (
@@ -288,7 +255,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                                                     onClick={handleDiscordLogin}
                                                     className="w-full py-4 bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
                                                 >
-                                                    {/* Discord Logo SVG */}
                                                     <svg className="w-5 h-5 fill-current" viewBox="0 0 127 96"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.11,77.11,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22c.63-23.28-1.24-45.66-18.9-72.15ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z" /></svg>
                                                     Connect Discord
                                                 </button>
@@ -313,7 +279,7 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                                         </div>
 
                                     ) : (
-                                        /* B. NORMAL TRIVIA INPUT (Fallback) */
+
                                         <div className="flex gap-2">
                                             <input
                                                 type="text"
@@ -331,7 +297,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                                 </div>
                             )}
 
-                            {/* WALLET CONNECT */}
                             {currentMode === 'WALLET' && (
                                 !account ? (
                                     <button onClick={handleForceConnect} className="w-full py-4 bg-white text-black font-bold rounded-xl flex items-center justify-center gap-2 transition-all hover:bg-zinc-200 shadow-[0_0_15px_rgba(255,255,255,0.2)]">
@@ -349,7 +314,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                                 )
                             )}
 
-                            {/* GEO SPLIT START */}
                             {currentMode === 'GEO' && (
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
@@ -373,9 +337,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                         </motion.div>
                     )}
 
-                    {/* =====================================================================================
-                     STATE: MOBILE GEO LANDING
-                    ===================================================================================== */}
                     {viewState === 'mobile_geo_landing' && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-6">
                             <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto border border-green-500/20">
@@ -399,10 +360,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                         </motion.div>
                     )}
 
-
-                    {/* =====================================================================================
-                     STATE: LOADING 
-                    ===================================================================================== */}
                     {viewState === 'checking' && (
                         <div className="flex flex-col items-center justify-center py-10">
                             <Loader2 className="w-10 h-10 text-purple-500 animate-spin mb-4" />
@@ -411,9 +368,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                     )}
 
 
-                    {/* =====================================================================================
-                     STATE: SUCCESS LOGIC (Transition)
-                    ===================================================================================== */}
                     {viewState === 'success_logic' && (
                         <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center py-6">
                             <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-500/30">
@@ -425,9 +379,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                     )}
 
 
-                    {/* =====================================================================================
-                     STATE: METHOD SELECTION
-                    ===================================================================================== */}
                     {viewState === 'method_select' && (
                         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
                             <div className="text-center mb-6">
@@ -439,7 +390,7 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                             </div>
 
                             <div className="flex gap-3">
-                                {/* OPTION A: MOBILE (QR) */}
+
                                 <button
                                     onClick={() => setViewState('scanning_qr')}
                                     className="flex-1 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-pink-500/50 p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-all group"
@@ -449,7 +400,7 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                                     <span className="text-[10px] text-green-500 font-mono tracking-wider">RECOMMENDED</span>
                                 </button>
 
-                                {/* OPTION B: DESKTOP (Bio) */}
+
                                 <button
                                     onClick={() => setViewState('biometric_pad')}
                                     disabled={!hasBioHardware}
@@ -467,10 +418,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                         </motion.div>
                     )}
 
-
-                    {/* =====================================================================================
-                     STATE: SCANNING QR
-                    ===================================================================================== */}
                     {viewState === 'scanning_qr' && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
                             <h3 className="text-lg font-bold text-white mb-2">Scan to Complete</h3>
@@ -492,10 +439,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                         </motion.div>
                     )}
 
-
-                    {/* =====================================================================================
-                     STATE: BIOMETRIC PAD
-                    ===================================================================================== */}
                     {viewState === 'biometric_pad' && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                             {proofToken ? (
@@ -515,9 +458,6 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
                     )}
 
 
-                    {/* =====================================================================================
-                     STATE: COMPLETED
-                    ===================================================================================== */}
                     {viewState === 'completed' && (
                         <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center py-8">
                             <div className="w-24 h-24 bg-gradient-to-tr from-green-400 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/30 animate-pulse">

@@ -8,7 +8,6 @@ export default function Navbar() {
     <nav className="w-full border-b border-zinc-800 bg-black/50 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
         
-        {/* Logo */}
         <div className="flex items-center gap-2">
           <img
             src="/op1.jpg"
@@ -21,7 +20,6 @@ export default function Navbar() {
           </span>
         </div>
 
-        {/* Wallet Button */}
         <div>
           {account ? (
             <div className="flex items-center gap-4">

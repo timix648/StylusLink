@@ -7,22 +7,20 @@ import Link from 'next/link';
 export default function AboutPage() {
     return (
         <div className="min-h-screen bg-black text-white relative overflow-x-hidden">
-            {/* Background */}
+         
             <div className="fixed inset-0 z-0 pointer-events-none">
                 <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,#1e1b4b,transparent_50%)]"></div>
                 <div className="absolute top-[20%] right-[10%] w-[500px] h-[500px] bg-purple-900/10 rounded-full blur-[128px]"></div>
                 <div className="absolute bottom-[10%] left-[10%] w-[400px] h-[400px] bg-indigo-900/10 rounded-full blur-[100px]"></div>
             </div>
 
-            {/* Content */}
             <div className="relative z-10 max-w-5xl mx-auto px-6 py-12">
-                {/* Back Button */}
+  
                 <Link href="/" className="inline-flex items-center gap-2 text-zinc-400 hover:text-white mb-8 transition-colors">
                     <ArrowLeft className="w-4 h-4" />
                     Back to Home
                 </Link>
 
-                {/* Header */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -41,7 +39,6 @@ export default function AboutPage() {
                     </div>
                 </motion.div>
 
-                {/* What is StylusLink */}
                 <section className="mb-16">
                     <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
                         <Target className="w-6 h-6 text-indigo-400" />
@@ -74,7 +71,6 @@ export default function AboutPage() {
                     </div>
                 </section>
 
-                {/* Current Capabilities */}
                 <section className="mb-16">
                     <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
                         <Layers className="w-6 h-6 text-purple-400" />
@@ -159,7 +155,6 @@ export default function AboutPage() {
                     </div>
                 </section>
 
-                {/* Quest Examples */}
                 <section className="mb-16">
                     <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
                         <Code2 className="w-6 h-6 text-green-400" />
@@ -237,7 +232,6 @@ export default function AboutPage() {
                     </div>
                 </section>
 
-                {/* Roadmap */}
                 <section className="mb-16">
                     <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
                         <TrendingUp className="w-6 h-6 text-yellow-400" />
@@ -302,7 +296,6 @@ export default function AboutPage() {
                     </div>
                 </section>
 
-                {/* Tech Stack */}
                 <section className="mb-16">
                     <h2 className="text-2xl font-bold mb-6">Tech Stack</h2>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -324,7 +317,6 @@ export default function AboutPage() {
                     </div>
                 </section>
 
-                {/* CTA */}
                 <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-center">
                     <h2 className="text-2xl font-bold mb-3">Ready to Create Your First Quest?</h2>
                     <p className="text-indigo-100 mb-6">Start gating rewards with AI-powered verification in minutes</p>
