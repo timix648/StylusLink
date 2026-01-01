@@ -3,9 +3,10 @@ import { useState } from 'react';
 import { ethers } from 'ethers';
 import { useWallet } from './WalletContext';
 import { 
-  Brain, Wallet, UserCheck, AlertCircle, Check, Copy, Loader2, Link as LinkIcon, Zap,
-  Github, Twitter, MessageCircle, Info, ChevronUp, ChevronDown 
+    Brain, Wallet, UserCheck, AlertCircle, Check, Copy, Loader2, Link as LinkIcon, Zap,
+    Github, Twitter, MessageCircle, Info, ChevronUp, ChevronDown 
 } from 'lucide-react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // --- CONFIGURATION ---
@@ -307,9 +308,9 @@ export default function CreateDrop() {
                     <a href="https://t.me/oxgenzero" target="_blank" className="flex items-center gap-3 px-4 py-2.5 bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl text-zinc-300 hover:text-white hover:bg-white/10 transition-all text-xs font-medium w-40">
                         <MessageCircle className="w-4 h-4" /> Telegram
                     </a>
-                    <button onClick={() => alert("StylusLink: A biometrically secured payment protocol on Arbitrum Stylus.")} className="flex items-center gap-3 px-4 py-2.5 bg-indigo-900/80 backdrop-blur-xl border border-indigo-500/30 rounded-xl text-indigo-200 hover:text-white hover:bg-indigo-900 transition-all text-xs font-medium w-40">
+                    <Link href="/about" className="flex items-center gap-3 px-4 py-2.5 bg-indigo-900/80 backdrop-blur-xl border border-indigo-500/30 rounded-xl text-indigo-200 hover:text-white hover:bg-indigo-900 transition-all text-xs font-medium w-40">
                         <Info className="w-4 h-4" /> About Project
-                    </button>
+                    </Link>
                 </motion.div>
             )}
         </AnimatePresence>
