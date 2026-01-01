@@ -10,7 +10,14 @@ export default function Navbar() {
         
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg animate-pulse" />
+          <video 
+            src="/logo.gif.mp4" 
+            autoPlay 
+            loop 
+            muted 
+            playsInline
+            className="w-8 h-8 rounded-lg object-cover"
+          />
           <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">
             StylusLink
           </span>
