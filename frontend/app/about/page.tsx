@@ -29,9 +29,11 @@ export default function AboutPage() {
                     className="mb-16"
                 >
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                            <Code2 className="w-6 h-6 text-white" />
-                        </div>
+                        <img
+                            src="/op1.jpg"
+                            alt="StylusLink"
+                            className="w-12 h-12 rounded-xl object-cover shadow-lg shadow-indigo-500/20"
+                        />
                         <div>
                             <h1 className="font-bold text-3xl tracking-tight">StylusLink Protocol</h1>
                             <p className="text-zinc-500 text-sm">AI-Powered Quest Gating on Arbitrum Stylus</p>

@@ -469,9 +469,11 @@ function GatekeeperApp() {
             {/* 1. NAVBAR */}
             <nav className="relative z-50 flex items-center justify-between px-6 md:px-12 py-6 w-full max-w-7xl mx-auto">
                 <a href="/about" className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
-                    <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                        <Code2 className="w-5 h-5 text-white" />
-                    </div>
+                    <img
+                        src="/op1.jpg"
+                        alt="StylusLink"
+                        className="w-10 h-10 rounded-xl object-cover shadow-lg shadow-indigo-500/20"
+                    />
                     <div>
                         <span className="font-bold text-lg tracking-tight block leading-none">StylusLink</span>
                         <span className="text-[10px] text-zinc-500 font-medium tracking-widest uppercase">Protocol</span>
