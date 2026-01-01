@@ -104,6 +104,12 @@ function GatekeeperApp() {
 
                 console.log('🎯 Final isActive decision:', isActive);
 
+                // Don't interrupt the claim flow or success celebration!
+                if (claimStep === 'processing' || claimStep === 'success') {
+                    console.log('⏸️ Pausing status checks - user is claiming/celebrating');
+                    return;
+                }
+
                 if (!isActive) {
                     setIsClaimed(true);
                     setClaimStep('claimed_already');
@@ -114,7 +120,7 @@ function GatekeeperApp() {
                 if (urlProof && claimStep === 'loading') {
                     console.log('📱 Mobile handoff detected - skipping to biometrics');
                     setProofToken(urlProof);
-                    setClaimStep('method'); // Show device selection
+                    setClaimStep('bio_check'); // Skip method selection, go straight to biometrics
                     return;
                 }
 
@@ -218,6 +224,12 @@ function GatekeeperApp() {
 
             if (res.data.success) {
                 setClaimStep('success');
+                
+                // After 5 seconds of celebration, show vault closed screen
+                setTimeout(() => {
+                    setIsClaimed(true);
+                    setClaimStep('claimed_already');
+                }, 5000);
             } else {
                 throw new Error(res.data.error || "Server rejected claim");
             }
