@@ -66,32 +66,62 @@ function GatekeeperApp() {
         if (!dropId) return;
 
         const checkStatus = async () => {
+            // Prevent hanging by using an AbortController with a timeout
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 4000);
+
             try {
                 const res = await fetch(`${API_URL}/check-claim/${dropId}`, {
-                    headers: { 'ngrok-skip-browser-warning': '1' }
+                    headers: { 'ngrok-skip-browser-warning': '1' },
+                    signal: controller.signal
                 });
+
+                clearTimeout(timeout);
                 const data = await res.json();
 
-                // 🛑 STRICT GATEKEEPING
-                // We trust the server's computed "status" field we just added
-                if (data.status !== 'ACTIVE') {
-                    setIsClaimed(true); // Triggers the "Vault Closed" UI
-                    setClaimStep('claimed_already');
-                    return; // ⛔ STOP HERE. Do not proceed to 'quest'.
+                console.log('📋 Backend response:', JSON.stringify(data));
+
+                // Support both response shapes:
+                // - { status: 'ACTIVE' }
+                // - { active: true }
+                let isActive = false;
+                if (typeof data.active === 'boolean') {
+                    isActive = data.active;
+                    console.log('✅ Using data.active:', isActive);
+                } else if (typeof data.status !== 'undefined') {
+                    isActive = data.status === 'ACTIVE';
+                    console.log('✅ Using data.status:', isActive);
+                } else if (data.details && data.details.expiresAt) {
+                    // Fallback: check expiresAt timestamp (stringified BigInt)
+                    try {
+                        const expires = Number(data.details.expiresAt);
+                        isActive = Date.now() / 1000 < expires;
+                        console.log('✅ Using expiresAt fallback:', isActive);
+                    } catch (e) {
+                        isActive = false;
+                    }
                 }
 
-                // if (!data.active) {
-                //setIsClaimed(true);
-                //setClaimStep('claimed_already');
-                //return; 
-                //}
+                console.log('🎯 Final isActive decision:', isActive);
 
-                // ✅ ONLY if Active AND currently loading, we show the quest
+                if (!isActive) {
+                    setIsClaimed(true);
+                    setClaimStep('claimed_already');
+                    return;
+                }
+
+                // Only transition to the quest view if we were loading
                 if (claimStep === 'loading' && !urlProof) {
                     setClaimStep('quest');
                 }
 
-            } catch (e) { console.error(e); }
+            } catch (e: any) {
+                console.error('Status check error:', e?.message || e);
+                // Don't hang the UI indefinitely — show the quest in offline/fallback mode
+                setErrorMsg('Unable to reach Gatekeeper; showing quest (offline check).');
+                if (claimStep === 'loading') setClaimStep('quest');
+                clearTimeout(timeout);
+            }
         };
 
         // Run immediately

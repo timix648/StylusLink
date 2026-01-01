@@ -42,8 +42,8 @@ app.use(cors({
     credentials: true
 }));
 
-// Handle preflight for all routes
-app.options('*', cors());
+// Handle preflight for all routes (Express 5+ syntax)
+app.options('/{*path}', cors());
 
 app.use(express.json());
 
@@ -59,11 +59,13 @@ const STYLUS_CONTRACT_ADDRESS = process.env.STYLUS_CONTRACT_ADDRESS;
 
 // ✅ UPGRADE 1: Expanded ABI to support Status Checks
 // We added the 'drops' function so the frontend can check if a drop is active/claimed.
+// ⚠️ CRITICAL: The last two fields are `bytes` (Vec<u8> in Rust), NOT `bytes32`
 const ABI = [
     // Write Functions
     "function claimDrop(uint256 drop_id, address receiver, uint8[] agent_signature, uint8[] biometric_signature, uint8[] message_hash) external",
     // Read Functions (Crucial for Route 3)
-    "function drops(uint256) external view returns (address sender, uint256 amount, bool active, uint64 expires_at, address gatekeeper, bytes32 condition_hash, bytes32 asset_id)",
+    // Returns: (sender, amount, active, expires_at, gatekeeper, signer_pub_key_x, signer_pub_key_y)
+    "function drops(uint256) external view returns (address sender, uint256 amount, bool active, uint64 expires_at, address gatekeeper, bytes signer_pub_key_x, bytes signer_pub_key_y)",
     // Events
     "event DropClaimed(uint256 indexed drop_id, address indexed receiver)"
 ];
@@ -1125,33 +1127,63 @@ app.post('/api/claim', async (req, res) => {
 
 
 // --- ROUTE 3: STATUS CHECK (Proxy for Frontend) ---
+// ⚠️ STYLUS FIX: Stylus contracts wrap Result<T, Vec<u8>> differently than Solidity.
+// We use raw eth_call and decode manually to avoid ABI mismatch.
 app.get('/api/check-claim/:dropId', async (req, res) => {
     try {
         const { dropId } = req.params;
 
-        // 1. Check Contract State (The Truth)
-        // We use the 'drops' view function we added to the ABI earlier.
-        let dropData;
+        // 1. Build the raw call data for drops(uint256)
+        // Function selector: keccak256("drops(uint256)")[0:4]
+        const functionSelector = ethers.id("drops(uint256)").slice(0, 10); // 0x + 8 chars
+        const encodedDropId = ethers.zeroPadValue(ethers.toBeHex(dropId), 32);
+        const callData = functionSelector + encodedDropId.slice(2);
+
+        // 2. Make raw eth_call
+        let rawResult;
         try {
-            dropData = await contract.drops(dropId);
+            rawResult = await relayerProvider.call({
+                to: STYLUS_CONTRACT_ADDRESS,
+                data: callData
+            });
         } catch (e) {
-            console.error("Contract Read Error:", e);
-            // Return default "Not Found" state rather than crashing
+            console.error("Contract Read Error:", e.message);
             return res.status(404).json({ error: "Drop not found or Contract Unreachable" });
         }
 
-        // Destructure array from Contract (Ethers v6 returns generic array/object structure)
-        // ABI: [sender, amount, active, expires_at, gatekeeper, condition_hash, asset_id]
-        const [sender, amount, isActive, expiresAt, gatekeeper, conditionHash] = dropData;
+        // 3. Decode the raw response manually (Stylus encoding)
+        // Stylus Result<T, Vec<u8>> wraps the tuple with extra offsets
+        // Layout: [offset1][offset2][sender][amount][active][expires_at][gatekeeper][offset_pubx][offset_puby][pubx_data][puby_data]
+        
+        if (!rawResult || rawResult === '0x' || rawResult.length < 200) {
+            return res.status(404).json({ error: "Drop not found (empty response)" });
+        }
 
-        // 2. If Inactive, Find Out WHO Claimed It
+        // Skip the first two 32-byte offset words (0x40 = 64 bytes = 128 hex chars + 2 for '0x')
+        const dataStart = 2 + 128; // Skip '0x' + 2 offset words
+        
+        // Parse fixed fields (each is 32 bytes = 64 hex chars)
+        const senderHex = '0x' + rawResult.slice(dataStart + 24, dataStart + 64); // Last 20 bytes of 32
+        const amountHex = '0x' + rawResult.slice(dataStart + 64, dataStart + 128);
+        const activeHex = '0x' + rawResult.slice(dataStart + 128, dataStart + 192);
+        const expiresHex = '0x' + rawResult.slice(dataStart + 192, dataStart + 256);
+        const gatekeeperHex = '0x' + rawResult.slice(dataStart + 216, dataStart + 256); // Last 20 bytes
+        
+        const sender = ethers.getAddress(senderHex);
+        const amount = BigInt(amountHex);
+        const isActive = BigInt(activeHex) !== 0n;
+        const expiresAt = BigInt(expiresHex);
+        const gatekeeper = ethers.getAddress(gatekeeperHex);
+
+        console.log(`📋 Drop ${dropId}: active=${isActive}, expires=${expiresAt}, sender=${sender}`);
+
+        // 4. If Inactive, Find Out WHO Claimed It
         let claimedBy = null;
         let reclaimed = false;
 
         if (!isActive) {
             // Check for DropClaimed Event to see if it was a user
             const claimFilter = contract.filters.DropClaimed(dropId);
-            // Querying from "earliest" block. In prod, you might optimize this to a specific deployment block.
             const claimEvents = await contract.queryFilter(claimFilter);
 
             if (claimEvents.length > 0) {
@@ -1162,8 +1194,7 @@ app.get('/api/check-claim/:dropId', async (req, res) => {
             }
         }
 
-        // 3. Construct Safe Response
-        // ⚠️ CRITICAL: res.json() crashes on BigInts. We MUST .toString() them.
+        // 5. Construct Safe Response
         res.json({
             active: isActive,
             claimed: !isActive && !reclaimed,
@@ -1171,10 +1202,9 @@ app.get('/api/check-claim/:dropId', async (req, res) => {
             claimedBy: claimedBy,
             details: {
                 sender: sender,
-                amount: amount.toString(),      // Fixes serialization crash
-                expiresAt: expiresAt.toString(), // Fixes serialization crash
-                gatekeeper: gatekeeper,
-                conditionHash: conditionHash
+                amount: amount.toString(),
+                expiresAt: expiresAt.toString(),
+                gatekeeper: gatekeeper
             }
         });
 

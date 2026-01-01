@@ -11,7 +11,7 @@ const nextConfig = {
     NEXT_PUBLIC_GATEKEEPER_URL: process.env.NEXT_PUBLIC_GATEKEEPER_URL,
   },
   
-  // Handle ngrok headers for development
+  // Handle headers for development and CSP for RainbowKit/Wagmi
   async headers() {
     return [
       {
@@ -20,6 +20,11 @@ const nextConfig = {
           {
             key: 'ngrok-skip-browser-warning',
             value: '1',
+          },
+          // Required for RainbowKit/Wagmi which uses eval-like code internally
+          {
+            key: 'Content-Security-Policy',
+            value: "script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:; img-src 'self' data: https:; font-src 'self' data:;",
           },
         ],
       },
