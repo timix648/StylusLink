@@ -10,13 +10,11 @@ export default function Navbar() {
         
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <video 
-            src="/logo.gif.mp4?v=2" 
-            autoPlay 
-            loop 
-            muted 
-            playsInline
+          <img
+            src="/op1.jpg"
+            alt="StylusLink"
             className="w-8 h-8 rounded-lg object-cover"
+            style={{ borderRadius: '8px' }}
           />
           <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">
             StylusLink
