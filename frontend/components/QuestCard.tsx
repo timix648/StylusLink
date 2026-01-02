@@ -29,6 +29,64 @@ function getQuestMode(rule: string, typeParam: string | null) {
     return 'TRIVIA';
 }
 
+// Sanitize rule to hide secret keywords/passwords from claimers
+function sanitizeRuleForDisplay(rule: string): string {
+    const r = rule.toLowerCase();
+    
+    // Patterns that indicate a secret keyword/password quest
+    const secretPatterns = [
+        /(?:say|enter|type|input|write|provide)\s+(?:the\s+)?(?:word|keyword|password|phrase|secret|code)\s*['""]?(\w+)['""]?/gi,
+        /(?:secret|password|keyword|code)\s+(?:is\s+)?['""]?(\w+)['""]?/gi,
+        /['""](\w+)['""]?\s+(?:is\s+)?(?:the\s+)?(?:secret|password|keyword|code)/gi,
+        /must\s+(?:say|enter|type)\s+['""]?(\w+)['""]?/gi,
+    ];
+    
+    // Check if this looks like a secret keyword quest
+    const isSecretQuest = secretPatterns.some(pattern => pattern.test(rule));
+    
+    if (isSecretQuest) {
+        // Replace the secret word with [HIDDEN]
+        let sanitized = rule;
+        
+        // Replace quoted strings that appear after secret-related words
+        sanitized = sanitized.replace(/(['""'])([^'""]+)\1/g, (match, quote, content) => {
+            // If the content looks like a secret keyword (not a common phrase)
+            if (content.length < 50 && !/\s{2,}/.test(content)) {
+                return `${quote}[HIDDEN]${quote}`;
+            }
+            return match;
+        });
+        
+        // Replace patterns like "say the word happy" -> "say the word [HIDDEN]"
+        sanitized = sanitized.replace(
+            /(say|enter|type|input|write|provide)\s+(the\s+)?(word|keyword|password|phrase|secret|code)\s+(\w+)/gi,
+            '$1 $2$3 [HIDDEN]'
+        );
+        
+        // Replace "password is xyz" -> "password is [HIDDEN]"
+        sanitized = sanitized.replace(
+            /(secret|password|keyword|code)\s+(is\s+)?(\w+)/gi,
+            (match, prefix, is, word) => {
+                // Don't hide common words that might be part of the phrase
+                const commonWords = ['the', 'a', 'to', 'be', 'able', 'required', 'needed'];
+                if (commonWords.includes(word.toLowerCase())) {
+                    return match;
+                }
+                return `${prefix} ${is || ''}[HIDDEN]`;
+            }
+        );
+        
+        return sanitized;
+    }
+    
+    // For trivia questions, show a hint instead of the full question if it contains the answer
+    if (r.includes('answer') && (r.includes('is') || r.includes('='))) {
+        return "Answer the question correctly to claim this reward.";
+    }
+    
+    return rule;
+}
+
 export default function QuestCard({ rule, dropId, onVerificationComplete }: QuestCardProps) {
     const searchParams = useSearchParams();
     const questType = searchParams.get('type');
@@ -229,7 +287,7 @@ export default function QuestCard({ rule, dropId, onVerificationComplete }: Ques
 
                     {viewState !== 'completed' && (
                         <div className="bg-black/20 p-4 rounded-xl border border-white/5 mb-6 font-sans text-sm text-zinc-300 leading-relaxed backdrop-blur-sm">
-                            {rule}
+                            {sanitizeRuleForDisplay(rule)}
                         </div>
                     )}
 

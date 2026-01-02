@@ -219,7 +219,7 @@ export default function CreateDrop() {
 
             <div className="md:col-span-7 flex flex-col h-full">
                 <label className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest mb-1.5 block">
-                    AI Instructions (Prompt)
+                    Natural Language Prompt
                 </label>
                 <div className="flex-1 relative group">
                     <textarea
@@ -233,7 +233,7 @@ export default function CreateDrop() {
                         className="w-full h-full min-h-[140px] bg-white/5 border border-white/10 p-4 rounded-xl text-white text-base focus:border-indigo-500 focus:bg-white/10 outline-none resize-none transition-all placeholder:text-zinc-600 leading-relaxed"
                     />
                     <div className="absolute bottom-3 right-3 text-[10px] text-zinc-500 bg-black/40 backdrop-blur px-2 py-0.5 rounded-full border border-white/5">
-                        Powered by GPT-4o
+                        Powered by Gemini AI
                     </div>
                 </div>
 

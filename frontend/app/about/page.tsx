@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Code2, Shield, Zap, Fingerprint, Globe, Wallet, CheckCircle, ArrowLeft, Target, Layers, TrendingUp, Lock } from 'lucide-react';
+import { Code2, Shield, Zap, Fingerprint, Globe, Wallet, CheckCircle, ArrowLeft, Target, Layers, TrendingUp, Lock, Brain } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AboutPage() {
@@ -46,7 +46,7 @@ export default function AboutPage() {
                     </h2>
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-sm">
                         <p className="text-zinc-300 mb-4 leading-relaxed">
-                            StylusLink is a decentralized quest protocol that combines <span className="text-indigo-400 font-semibold">AI-powered verification</span>, <span className="text-purple-400 font-semibold">biometric authentication</span>, and <span className="text-pink-400 font-semibold">smart contract automation</span> on Arbitrum Stylus (Rust-based EVM).
+                            StylusLink is a decentralized quest protocol that combines <span className="text-indigo-400 font-semibold">AI-powered verification</span>, <span className="text-purple-400 font-semibold">biometric authentication</span>, and <span className="text-pink-400 font-semibold">smart contract automation</span> on Arbitrum Stylus.
                         </p>
                         <p className="text-zinc-300 mb-4 leading-relaxed">
                             Creators can gate ETH rewards behind <strong>natural language rules</strong> verified by Gemini AI — no manual checks, no central authority. The protocol ensures trust through cryptographic proofs and on-chain transparency.
@@ -55,7 +55,7 @@ export default function AboutPage() {
                             <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4">
                                 <Shield className="w-6 h-6 text-indigo-400 mb-2" />
                                 <h3 className="font-bold text-sm mb-1">AI Gatekeeper</h3>
-                                <p className="text-xs text-zinc-400">Gemini 2.0 verifies wallet conditions automatically</p>
+                                <p className="text-xs text-zinc-400">Gemini AI verifies wallet conditions automatically</p>
                             </div>
                             <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
                                 <Fingerprint className="w-6 h-6 text-purple-400 mb-2" />
@@ -78,6 +78,17 @@ export default function AboutPage() {
                     </h2>
                     <div className="space-y-4">
                         {[
+                            {
+                                category: "Trivia & Secret Keywords",
+                                icon: <Brain className="w-5 h-5" />,
+                                examples: [
+                                    "Answer a trivia question (e.g., 'Who created Ethereum?')",
+                                    "Say the secret password to claim (hidden from claimers)",
+                                    "Creative challenges (e.g., 'Write a haiku about Web3')",
+                                    "Knowledge quizzes (e.g., 'What is the gas limit?')",
+                                    "Keyword verification without revealing the answer"
+                                ]
+                            },
                             {
                                 category: "Wallet Financial Stats",
                                 icon: <Wallet className="w-5 h-5" />,
@@ -227,6 +238,23 @@ export default function AboutPage() {
                             <div className="flex gap-2 flex-wrap">
                                 <span className="text-xs bg-white/5 px-2 py-1 rounded">Geolocation</span>
                                 <span className="text-xs bg-white/5 px-2 py-1 rounded">Mobile Biometric</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-pink-900/20 to-violet-900/20 border border-pink-500/30 rounded-2xl p-6">
+                            <div className="flex items-start justify-between mb-4">
+                                <div>
+                                    <span className="bg-pink-500/20 text-pink-300 px-3 py-1 rounded-full text-xs font-bold">TRIVIA</span>
+                                    <h3 className="font-bold text-xl mt-3">Secret Keyword Challenge</h3>
+                                </div>
+                                <span className="text-2xl font-bold text-white">0.015 ETH</span>
+                            </div>
+                            <p className="text-zinc-300 mb-4 font-mono text-sm bg-black/30 p-4 rounded-lg border border-white/5">
+                                "User must enter the secret keyword to claim" (keyword hidden from claimers)
+                            </p>
+                            <div className="flex gap-2 flex-wrap">
+                                <span className="text-xs bg-white/5 px-2 py-1 rounded">Secret Password</span>
+                                <span className="text-xs bg-white/5 px-2 py-1 rounded">AI Verified</span>
                             </div>
                         </div>
                     </div>
