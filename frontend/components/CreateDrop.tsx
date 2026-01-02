@@ -166,8 +166,13 @@ export default function CreateDrop() {
                         <div className="relative">
                             <input
                                 type="number"
+                                min="0"
+                                step="0.001"
                                 value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
+                                onChange={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    setAmount(isNaN(val) || val < 0 ? '0' : e.target.value);
+                                }}
                                 className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-white text-lg font-medium focus:border-indigo-500 focus:bg-white/10 outline-none transition-all"
                             />
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-500">ETH</span>
