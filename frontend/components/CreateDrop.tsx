@@ -233,7 +233,7 @@ export default function CreateDrop() {
                         placeholder={
                             questType === 'KNOWLEDGE' ? "e.g. 'The user must answer: What is the capital of France?'" :
                             questType === 'ONCHAIN' ? "e.g. 'User must own at least 0.1 ETH and a Pudgy Penguin NFT.'" :
-                            "e.g. 'User must be physically located in Lagos, Nigeria.'"
+                            "e.g. 'User must be physically located in Alabama, United States.'"
                         }
                         className="w-full h-full min-h-[140px] bg-white/5 border border-white/10 p-4 rounded-xl text-white text-base focus:border-indigo-500 focus:bg-white/10 outline-none resize-none transition-all placeholder:text-zinc-600 leading-relaxed"
                     />
