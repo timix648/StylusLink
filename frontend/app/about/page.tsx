@@ -275,7 +275,7 @@ export default function AboutPage() {
                             <div className="flex-1">
                                 <h3 className="font-bold text-xl text-white mb-3">How to Use Discord Role Verification</h3>
                                 <p className="text-zinc-300 text-sm leading-relaxed mb-4">
-                                    To create quests that verify Discord roles or server membership, you need to add the <span className="font-bold text-blue-400">StylusLink Gatekeeper Bot</span> to your Discord server. This bot checks if users have specific roles or are members of your server.
+                                    To create quests that verify Discord roles or server membership, you need to add the <span className="font-bold text-blue-400">StylusLink Discord Bot</span> to your Discord server. This bot checks if users have specific roles or are members of your server.
                                 </p>
                                 
                                 <div className="bg-black/40 border border-white/10 rounded-xl p-4 mb-4">
