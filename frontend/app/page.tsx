@@ -419,7 +419,7 @@ function GatekeeperApp() {
                     />
                     <div>
                         <span className="font-bold text-lg tracking-tight block leading-none">StylusLink</span>
-                        <span className="text-[10px] text-zinc-500 font-medium tracking-widest uppercase">Protocol</span>
+                        <span className="text-[10px] text-zinc-500 font-medium tracking-widest uppercase">Protocol (Testnet)</span>
                     </div>
                 </a>
 
