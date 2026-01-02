@@ -33,7 +33,7 @@ export default function AboutPage() {
                             className="w-12 h-12 rounded-xl object-cover shadow-lg shadow-indigo-500/20"
                         />
                         <div>
-                            <h1 className="font-bold text-3xl tracking-tight">StylusLink Protocol</h1>
+                            <h1 className="font-bold text-3xl tracking-tight">StylusLink Protocol (Testnet)</h1>
                             <p className="text-zinc-500 text-sm">AI-Powered Quest Gating on Arbitrum Stylus</p>
                         </div>
                     </div>
@@ -272,9 +272,9 @@ export default function AboutPage() {
                                 <h3 className="font-bold">Phase 1: MVP (Current)</h3>
                             </div>
                             <ul className="text-sm text-zinc-400 space-y-1 ml-7">
-                                <li>• AI-powered quest verification (Gemini 2.0)</li>
+                                <li>• AI-powered quest verification</li>
                                 <li>• Biometric authentication (WebAuthn)</li>
-                                <li>• Multi-chain balance checks (5 Sepolia testnets)</li>
+                                <li>• Multi-chain balance checks (5 Sepolia testnets + 5 Mainnets)</li>
                                 <li>• NFT & token gating</li>
                                 <li>• Quest creator dashboard</li>
                             </ul>
@@ -287,8 +287,8 @@ export default function AboutPage() {
                             </div>
                             <ul className="text-sm text-zinc-400 space-y-1 ml-7">
                                 <li>• Deploy to Arbitrum One mainnet</li>
-                                <li>• Support 10+ EVM chains (Ethereum, Base, Optimism, Polygon)</li>
-                                <li>• Enhanced social verification (Twitter, Discord, GitHub)</li>
+                                <li>• Support 10+ EVM chains (Including Solana Ecosystem)</li>
+                                <li>• Enhanced social verification (Twitter, Discord, GitHub, Youtube)</li>
                                 <li>• Quest templates & marketplace</li>
                                 <li>• Analytics dashboard for creators</li>
                             </ul>
@@ -304,7 +304,6 @@ export default function AboutPage() {
                                 <li>• Team-based quests (multi-sig claims)</li>
                                 <li>• Reputation system & leaderboards</li>
                                 <li>• SDK for dApp integration</li>
-                                <li>• Governance token launch</li>
                             </ul>
                         </div>
 
@@ -329,7 +328,7 @@ export default function AboutPage() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {[
                             { name: "Arbitrum Stylus", desc: "Rust Smart Contracts" },
-                            { name: "Gemini 2.0", desc: "AI Verification" },
+                            { name: "Gemini AI", desc: "AI Verification" },
                             { name: "Next.js 16", desc: "Frontend Framework" },
                             { name: "Ethers v6", desc: "Web3 Library" },
                             { name: "RainbowKit", desc: "Wallet Connect" },

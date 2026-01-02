@@ -35,7 +35,7 @@ function sanitizeRuleForDisplay(rule: string): string {
     
     // Patterns that indicate a secret keyword/password quest
     const secretPatterns = [
-        /(?:say|enter|type|input|write|provide)\s+(?:the\s+)?(?:word|keyword |key word |should say|password|phrase|secret|code)\s*['""]?(\w+)['""]?/gi,
+        /(?:say|enter|type|input|write|provide)\s+(?:the\s+)?(?:word|keyword|password|phrase|secret|code)\s*['""]?(\w+)['""]?/gi,
         /(?:secret|password|keyword|code)\s+(?:is\s+)?['""]?(\w+)['""]?/gi,
         /['""](\w+)['""]?\s+(?:is\s+)?(?:the\s+)?(?:secret|password|keyword|code)/gi,
         /must\s+(?:say|enter|type)\s+['""]?(\w+)['""]?/gi,
