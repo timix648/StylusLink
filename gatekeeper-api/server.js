@@ -59,11 +59,11 @@ if (PRIVATE_KEY && STYLUS_CONTRACT_ADDRESS) {
 }
 
 const MODELS = [
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-exp",
-    "gemini-2.5-flash-lite",
-    "gemini-2.5-flash",
-    "gemini-3-flash-preview"
+   "gemini-2.0-flash",
+   "gemini-2.0-flash-exp",
+   "gemini-2.5-flash-lite",
+   "gemini-2.5-flash",
+   "gemini-3-flash-preview"
 
 ];
 
@@ -347,6 +347,19 @@ const toolsDefinition = [
                 longitude: { type: "NUMBER", description: "GPS Longitude from user" }
             },
             required: ["checkType"]
+        }
+    },
+    {
+        name: "check_time_timezone",
+        description: "Checks current local time and date for a specific location using GPS coordinates or city name. Use this for time-based requirements like 'after 7:50PM', 'before midnight', 'between 9AM-5PM', or verifying timezone for specific cities like Abuja.",
+        parameters: {
+            type: "OBJECT",
+            properties: {
+                latitude: { type: "NUMBER", description: "GPS Latitude from user" },
+                longitude: { type: "NUMBER", description: "GPS Longitude from user" },
+                cityName: { type: "STRING", description: "City name (e.g., 'Lagos') - optional if lat/long provided" }
+            },
+            required: []
         }
     }
 ];
@@ -645,7 +658,119 @@ const functions = {
         }
 
         return { error: `Unknown check type: ${type}` };
+    },
+
+    check_time_timezone: async ({ latitude, longitude, cityName }) => {
+        console.log(`[Gatekeeper] Checking Time & Timezone | Lat: ${latitude}, Lon: ${longitude}, City: ${cityName}`);
+        
+        try {
+            let lat = latitude;
+            let lon = longitude;
+            
+            // If no coordinates but city name provided, geocode it first
+            if (!lat && !lon && cityName) {
+                const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityName)}`;
+                const geoRes = await axios.get(geocodeUrl, {
+                    headers: { 'User-Agent': 'StylusLink-Gatekeeper/1.0' },
+                    timeout: 4000
+                });
+                
+                if (geoRes.data && geoRes.data[0]) {
+                    lat = parseFloat(geoRes.data[0].lat);
+                    lon = parseFloat(geoRes.data[0].lon);
+                    console.log(`[Geocoded] ${cityName} -> Lat: ${lat}, Lon: ${lon}`);
+                } else {
+                    return { error: `Could not find coordinates for city: ${cityName}` };
+                }
+            }
+            
+            if (!lat || !lon) {
+                return { error: "Latitude and Longitude required for time check" };
+            }
+            
+            // Get timezone and location info
+            const timezoneUrl = `https://timeapi.io/api/timezone/coordinate?latitude=${lat}&longitude=${lon}`;
+            const locationUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+            
+            const [timezoneRes, locationRes] = await Promise.all([
+                axios.get(timezoneUrl, { timeout: 5000 }).catch(e => null),
+                axios.get(locationUrl, { 
+                    headers: { 'User-Agent': 'StylusLink-Gatekeeper/1.0' },
+                    timeout: 4000 
+                }).catch(e => null)
+            ]);
+            
+            let timeData = {};
+            let locationData = {};
+            
+            // Parse timezone response
+            if (timezoneRes && timezoneRes.data) {
+                const data = timezoneRes.data;
+                timeData = {
+                    timezone: data.timeZone,
+                    current_time: data.currentLocalTime,
+                    current_date: data.currentUtcOffset?.seconds ? new Date(Date.now() + data.currentUtcOffset.seconds * 1000).toISOString().split('T')[0] : null,
+                    utc_offset: data.currentUtcOffset?.label || data.currentUtcOffset,
+                    is_dst: data.dstActive || false
+                };
+            } else {
+                // Fallback: Calculate time based on rough timezone estimation
+                // This is a basic fallback, not as accurate
+                const utcOffset = Math.round(lon / 15); // Rough estimate: 15° per hour
+                const now = new Date();
+                const localTime = new Date(now.getTime() + utcOffset * 60 * 60 * 1000);
+                timeData = {
+                    timezone: `UTC${utcOffset >= 0 ? '+' : ''}${utcOffset}`,
+                    current_time: localTime.toISOString(),
+                    current_date: localTime.toISOString().split('T')[0],
+                    utc_offset: `UTC${utcOffset >= 0 ? '+' : ''}${utcOffset}`,
+                    is_dst: false,
+                    note: "Fallback calculation - may not account for DST"
+                };
+            }
+            
+            // Parse location response
+            if (locationRes && locationRes.data) {
+                const addr = locationRes.data.address || {};
+                locationData = {
+                    city: addr.city || addr.town || addr.village || "Unknown",
+                    state: addr.state || addr.province || "",
+                    country: addr.country || "Unknown",
+                    display_name: locationRes.data.display_name
+                };
+            }
+            
+            // Extract hour and minute for easier time comparisons
+            const timeStr = timeData.current_time;
+            let hour = 0, minute = 0;
+            if (timeStr) {
+                const match = timeStr.match(/T?(\d{2}):(\d{2})/);
+                if (match) {
+                    hour = parseInt(match[1]);
+                    minute = parseInt(match[2]);
+                }
+            }
+            
+            return {
+                verified: true,
+                ...timeData,
+                ...locationData,
+                time_24hr: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
+                hour: hour,
+                minute: minute,
+                coordinates: { latitude: lat, longitude: lon }
+            };
+            
+        } catch (e) {
+            console.error("[Time Check Error]", e.message);
+            return { 
+                error: "Failed to retrieve time/timezone data", 
+                details: e.message,
+                fallback_utc_time: new Date().toISOString()
+            };
+        }
     }
+
 
 };
 
@@ -763,6 +888,16 @@ async function runGatekeeper(rule, user_data, modelIndex = 0) {
         ---------------------------------------------------------
         USE TOOL: 'check_sybil_geo_real'
 
+        TYPE H: TIME & TIMEZONE CHECKS
+        (Examples: "Can only claim after 7:50PM", "Must be before midnight", "Only on weekends", "Must be in Lagos at 8PM")
+        ---------------------------------------------------------
+        USE TOOL: 'check_time_timezone'
+        - For time requirements, check the user's LOCAL TIME based on their GPS coordinates
+        - Compare 'hour' and 'minute' fields from the tool response
+        - For location + time (e.g., "in Lagos after 7:50PM"), check BOTH 'city' matches AND time requirements
+        - The tool returns: timezone, current_time, hour, minute, city, country
+        - Example: "after 7:50PM" means hour >= 19 AND (hour > 19 OR minute >= 50)
+
         ### HALLUCINATION GUARD:
         - NEVER call a tool for Trivia (e.g. "What is 2+2?").
         - If a tool returns an error (e.g. "Token not found") -> REJECT.
@@ -800,6 +935,11 @@ async function runGatekeeper(rule, user_data, modelIndex = 0) {
                     if (!toolArgs.longitude) toolArgs.longitude = user_data.longitude;
                 }
 
+                if (call.name === 'check_time_timezone') {
+                    if (!toolArgs.latitude) toolArgs.latitude = user_data.latitude;
+                    if (!toolArgs.longitude) toolArgs.longitude = user_data.longitude;
+                }
+
                 if (call.name === 'check_discord_membership') {
                     if (!toolArgs.userId) toolArgs.userId = user_data.discordId;
                     if (!toolArgs.guildId) {
@@ -814,13 +954,26 @@ async function runGatekeeper(rule, user_data, modelIndex = 0) {
                 }
 
                 const output = await fn(toolArgs);
+                console.log(`[Gatekeeper] 📊 Tool Output:`, JSON.stringify(output).substring(0, 500));
                 result = await chat.sendMessage([{ functionResponse: { name: call.name, response: { content: output } } }]);
                 call = result.response.functionCalls()?.[0];
             } else {
                 break;
             }
         }
+        
+        // After all tools complete, get the final AI response
         let responseText = result.response.text();
+        console.log(`[Gatekeeper] 📝 Raw AI Response:`, responseText);
+        
+        // If response is empty after tool calls, prompt for final decision
+        if (!responseText || responseText.trim() === '') {
+            console.warn(`[Gatekeeper] Empty response after ${turns} tool calls. Requesting final decision...`);
+            result = await chat.sendMessage('Based on the tool results above, provide your final decision in JSON format: {"approved": boolean, "explanation": "..."}');
+            responseText = result.response.text();
+            console.log(`[Gatekeeper] 📝 Follow-up AI Response:`, responseText);
+        }
+        
         responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
         return responseText;
 
@@ -831,10 +984,24 @@ async function runGatekeeper(rule, user_data, modelIndex = 0) {
 }
 
 function parseAIResponse(text) {
+    if (!text || text.trim() === '') {
+        console.warn("[Parse] Empty AI response received");
+        return { approved: false, explanation: "AI returned empty response. Please try again." };
+    }
+    
     let clean = text.replace(/```json/g, "").replace(/```/g, "").trim();
     const start = clean.indexOf('{');
     const end = clean.lastIndexOf('}');
-    if (start === -1 || end === -1) throw new Error("No JSON object found in response");
+    
+    if (start === -1 || end === -1) {
+        console.warn("[Parse] No JSON found in AI response:", text.substring(0, 200));
+        // Try to infer from text
+        const lowerText = text.toLowerCase();
+        if (lowerText.includes('approved') && lowerText.includes('true')) {
+            return { approved: true, explanation: "Verification passed (inferred from text)" };
+        }
+        return { approved: false, explanation: "Could not parse AI response. Please try again." };
+    }
 
     clean = clean.substring(start, end + 1);
 
@@ -844,8 +1011,13 @@ function parseAIResponse(text) {
         try {
             return new Function("return " + clean)();
         } catch (e2) {
-            console.error("Critical Parse Error. Raw AI Text:", text);
-            return null;
+            console.error("[Parse] Critical Parse Error. Raw AI Text:", text.substring(0, 300));
+            // Final fallback - try to infer approval
+            const lowerText = text.toLowerCase();
+            if (lowerText.includes('"approved": true') || lowerText.includes('"approved":true')) {
+                return { approved: true, explanation: "Parsed from partial response" };
+            }
+            return { approved: false, explanation: "Response parsing failed" };
         }
     }
 }
@@ -976,7 +1148,8 @@ app.get('/api/check-claim/:dropId', async (req, res) => {
         const expiresAt = BigInt(expiresHex);
         const gatekeeper = ethers.getAddress(gatekeeperHex);
 
-        console.log(`Drop ${dropId}: active=${isActive}, expires=${expiresAt}, sender=${sender}`);
+        // Silenced the drop status check
+        // console.log(`Drop ${dropId}: active=${isActive}, expires=${expiresAt}, sender=${sender}`);
         let claimedBy = null;
         let reclaimed = false;
 
