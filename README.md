@@ -200,7 +200,7 @@ StylusLink/
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -283,7 +283,7 @@ cargo stylus deploy --private-key $PRIVATE_KEY
 
 ---
 
-## 🎮 Usage Flow
+## Usage Flow
 
 ### Creating a Smart Drop (Quest)
 
@@ -434,7 +434,7 @@ The AI doesn't decide subjectively—it **interprets deterministic tool outputs*
 |----------|------------------------|
 | **Technical Completeness** | Full-stack: Rust contract + Node.js API + Next.js frontend |
 | **Creativity** | First AI-gated biometric payment protocol on Stylus |
-| **Wow Factor** | Claim crypto with FaceID—no wallet, no seed phrase |
+| **Wow Factor** | Claim crypto with Biometrics, no seed phrase |
 | **Stylus Utilization** | P-256 precompile enables economically viable biometrics |
 
 

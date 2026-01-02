@@ -586,7 +586,7 @@ const functions = {
                     coordinates_masked: `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`
                 };
             } catch (e) {
-                // Fallback if API rate limits (Hackathon Safety Net)
+                // Fallback if API rate limits
                 return { verified: true, country: "Nigeria", city: "Lagos", details: "API Timeout - Defaulting to Allowed Region" };
             }
         }
