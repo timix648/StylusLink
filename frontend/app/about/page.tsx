@@ -74,7 +74,7 @@ export default function AboutPage() {
                 <section className="mb-16">
                     <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
                         <Layers className="w-6 h-6 text-purple-400" />
-                        Current Verification Modes
+                        Examples Of Current Ability
                     </h2>
                     <div className="space-y-4">
                         {[
