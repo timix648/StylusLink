@@ -24,7 +24,7 @@ function getQuestMode(rule: string, typeParam: string | null) {
     if (r.includes('discord') || r.includes('twitter') || r.includes('follow') || r.includes('follows') || r.includes('followers') || r.includes('youtube') || r.includes('role') || r.includes('username') || r.includes('handle')) {
         return 'TRIVIA';
     }
-    if (r.includes('location') || r.includes('Location') || r.includes('gps') || r.includes('is in') || r.includes('should be in') || r.includes('must be in') || r.includes('country') || r.includes('geographical') || r.includes('region') || r.includes('vpn') || r.includes('city') || typeParam === 'geo') return 'GEO';
+    if (r.includes('location') || r.includes('Location') || r.includes('gps') || r.includes('world') || r.includes('is in') || r.includes('should be in') || r.includes('must be in') || r.includes('country') || r.includes('geographical') || r.includes('region') || r.includes('vpn') || r.includes('city') || typeParam === 'geo') return 'GEO';
     if (typeParam === 'wallet' || r.includes('eth') || r.includes('should have') || r.includes('must hold') || r.includes('must have') || r.includes('hold') || r.includes('tokens') || r.includes('token') || r.includes('wallet') || r.includes('eth') || r.includes('ETH') || r.includes('network') || r.includes('balance')) return 'WALLET';
     return 'TRIVIA';
 }
