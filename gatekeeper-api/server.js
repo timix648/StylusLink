@@ -33,7 +33,15 @@ app.use((req, res, next) => {
 app.use(express.json());
 
 const PORT = process.env.PORT || 4000;
-const GEN_AI_KEY = process.env.GEMINI_API_KEY;
+// Load multiple Gemini API keys (fallback system)
+const GEN_AI_KEYS = [
+    process.env.GEMINI_API_KEY,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3
+].filter(key => key && key.trim() !== ''); // Filter out empty keys
+
+console.log(`[Gatekeeper] Loaded ${GEN_AI_KEYS.length} Gemini API key(s)`);
+
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
@@ -297,15 +305,16 @@ const toolsDefinition = [
     },
     {
         name: "check_nft_ownership",
-        description: "Checks ownership of NFTs. Can check by 'collectionName' (e.g. 'Pudgy Penguins', 'ENS') OR 'contractAddress'.",
+        description: "Checks ownership of NFTs. For KNOWN collections (Pudgy Penguins, BAYC, ENS, etc.), ONLY provide 'collectionName' - the system automatically uses the correct mainnet chain. For custom/unknown NFTs, provide both 'contractAddress' and 'chain'.",
         parameters: {
             type: "OBJECT",
             properties: {
-                address: { type: "STRING" },
-                collectionName: { type: "STRING", description: "Name of collection (e.g. 'BAYC') or Contract Address" },
-                chain: { type: "STRING" }
+                address: { type: "STRING", description: "User's wallet address to check" },
+                collectionName: { type: "STRING", description: "Name of known collection (e.g. 'BAYC', 'Pudgy Penguins'). Do NOT provide 'chain' if using this." },
+                contractAddress: { type: "STRING", description: "Contract address for custom NFTs (requires 'chain' parameter)" },
+                chain: { type: "STRING", description: "Only use with 'contractAddress' OR if rule explicitly mentions a testnet (e.g., 'on Sepolia')" }
             },
-            required: ["address", "collectionName", "chain"]
+            required: ["address"]
         }
     },
     {
@@ -503,23 +512,45 @@ const functions = {
 
     check_nft_ownership: async ({ address, contractAddress, collectionName, chain }) => {
 
-        let selectedChain = chain ? resolveChainAlias(chain) : null;
+        let selectedChain = null;
+        let targetAddress = null;
 
-        let targetAddress = contractAddress;
-
-        if (!targetAddress && collectionName) {
+        if (collectionName) {
             const col = KNOWN_COLLECTIONS[collectionName.toUpperCase()];
             if (col) {
                 targetAddress = col.address;
-                if (!selectedChain) selectedChain = resolveChainAlias(col.chain);
+                selectedChain = resolveChainAlias(col.chain);
+                console.log(`[NFT Check] Known collection "${collectionName}" found - using ${selectedChain} (mainnet) with address ${targetAddress}`);
+            } else {
+                selectedChain = chain ? resolveChainAlias(chain) : null;
+                targetAddress = contractAddress;
+                console.log(`[NFT Check] Unknown collection "${collectionName}" - using provided chain: ${selectedChain || 'none'}`);
             }
+        } else {
+            targetAddress = contractAddress;
+            selectedChain = chain ? resolveChainAlias(chain) : null;
         }
 
-        if (!targetAddress || !selectedChain) return { error: "Contract Address or Valid Collection Name required" };
+        if (!targetAddress || !selectedChain) {
+            return { 
+                error: "Contract Address or Valid Collection Name required",
+                note: "For known collections (Pudgy Penguins, BAYC, etc.), only provide collectionName. For custom NFTs, provide contractAddress + chain."
+            };
+        }
 
         try {
             const provider = providers[selectedChain];
-            if (!provider) return { error: `Provider for ${selectedChain} not configured` };
+            if (!provider) {
+                console.warn(`[NFT Check] Provider for ${selectedChain} not configured. Assuming user does NOT own NFT.`);
+                return {
+                    collection: collectionName || "Unknown",
+                    contract: targetAddress,
+                    balance: "0",
+                    owns_nft: false,
+                    chain: selectedChain,
+                    note: "Provider not configured - assuming no NFT ownership"
+                };
+            }
 
             const contract = new ethers.Contract(targetAddress, ["function balanceOf(address) view returns (uint256)"], provider);
             const bal = await contract.balanceOf(address);
@@ -531,7 +562,18 @@ const functions = {
                 owns_nft: bal > 0n,
                 chain: selectedChain
             };
-        } catch (e) { return { error: "NFT Check failed", details: e.message }; }
+        } catch (e) {
+            console.error(`[NFT Check] Error checking ${collectionName} on ${selectedChain}:`, e.message);
+            return { 
+                collection: collectionName || "Unknown",
+                contract: targetAddress,
+                balance: "0",
+                owns_nft: false,
+                chain: selectedChain,
+                error: "NFT Check failed - assuming no ownership",
+                details: e.message 
+            };
+        }
     },
 
     check_discord_membership: async ({ userId, guildId, roleId }) => {
@@ -661,6 +703,28 @@ const functions = {
 
     check_time_timezone: async ({ latitude, longitude, cityName }) => {
         console.log(`[Gatekeeper] Checking Time & Timezone | Lat: ${latitude}, Lon: ${longitude}, City: ${cityName}`);
+
+        const COUNTRY_TIMEZONE_MAP = {
+            'Nigeria': { offset: 1, name: 'WAT', fullName: 'West Africa Time' },
+            'Ghana': { offset: 0, name: 'GMT', fullName: 'Greenwich Mean Time' },
+            'South Africa': { offset: 2, name: 'SAST', fullName: 'South Africa Standard Time' },
+            'Kenya': { offset: 3, name: 'EAT', fullName: 'East Africa Time' },
+            'Egypt': { offset: 2, name: 'EET', fullName: 'Eastern European Time' },
+            'Morocco': { offset: 1, name: 'WEST', fullName: 'Western European Summer Time' },
+            'United Kingdom': { offset: 0, name: 'GMT', fullName: 'Greenwich Mean Time' },
+            'United States': { offset: -5, name: 'EST', fullName: 'Eastern Standard Time' }, 
+            'India': { offset: 5.5, name: 'IST', fullName: 'India Standard Time' },
+            'China': { offset: 8, name: 'CST', fullName: 'China Standard Time' },
+            'Japan': { offset: 9, name: 'JST', fullName: 'Japan Standard Time' },
+            'Australia': { offset: 10, name: 'AEST', fullName: 'Australian Eastern Standard Time' },
+            'Indonesia': { offset: 7, name: 'WIB', fullName: 'Western Indonesia Time' }, 
+            'Brazil': { offset: -3, name: 'BRT', fullName: 'Brasília Time' },
+            'Mexico': { offset: -6, name: 'CST', fullName: 'Central Standard Time' }, 
+            'Philippines': { offset: 8, name: 'PST', fullName: 'Philippine Standard Time' },
+            'Turkey': { offset: 3, name: 'TRT', fullName: 'Turkey Time' },
+            'Thailand': { offset: 7, name: 'ICT', fullName: 'Indochina Time' },
+            'Vietnam': { offset: 7, name: 'ICT', fullName: 'Indochina Time' }
+        };
         
         try {
             let lat = latitude;
@@ -687,57 +751,234 @@ const functions = {
                 return { error: "Latitude and Longitude required for time check" };
             }
             
-            // Get timezone and location info
-            const timezoneUrl = `https://timeapi.io/api/timezone/coordinate?latitude=${lat}&longitude=${lon}`;
+            // Get location info first (needed for fallback timezone detection)
             const locationUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+            const locationRes = await axios.get(locationUrl, { 
+                headers: { 'User-Agent': 'StylusLink-Gatekeeper/1.0' },
+                timeout: 4000 
+            }).catch(e => null);
             
-            const [timezoneRes, locationRes] = await Promise.all([
-                axios.get(timezoneUrl, { timeout: 5000 }).catch(e => null),
-                axios.get(locationUrl, { 
-                    headers: { 'User-Agent': 'StylusLink-Gatekeeper/1.0' },
-                    timeout: 4000 
-                }).catch(e => null)
-            ]);
-            
-            let timeData = {};
             let locationData = {};
+            let country = null;
             
-            // Parse timezone response
-            if (timezoneRes && timezoneRes.data) {
-                const data = timezoneRes.data;
-                timeData = {
-                    timezone: data.timeZone,
-                    current_time: data.currentLocalTime,
-                    current_date: data.currentUtcOffset?.seconds ? new Date(Date.now() + data.currentUtcOffset.seconds * 1000).toISOString().split('T')[0] : null,
-                    utc_offset: data.currentUtcOffset?.label || data.currentUtcOffset,
-                    is_dst: data.dstActive || false
-                };
-            } else {
-                const utcOffset = Math.round(lon / 15); // Rough estimate: 15° per hour
-                const now = new Date();
-                const localTime = new Date(now.getTime() + utcOffset * 60 * 60 * 1000);
-                timeData = {
-                    timezone: `UTC${utcOffset >= 0 ? '+' : ''}${utcOffset}`,
-                    current_time: localTime.toISOString(),
-                    current_date: localTime.toISOString().split('T')[0],
-                    utc_offset: `UTC${utcOffset >= 0 ? '+' : ''}${utcOffset}`,
-                    is_dst: false,
-                    note: "Fallback calculation - may not account for DST"
-                };
-            }
-            
-            // Parse location response
             if (locationRes && locationRes.data) {
                 const addr = locationRes.data.address || {};
+                country = addr.country;
                 locationData = {
                     city: addr.city || addr.town || addr.village || "Unknown",
                     state: addr.state || addr.province || "",
-                    country: addr.country || "Unknown",
+                    country: country || "Unknown",
                     display_name: locationRes.data.display_name
                 };
             }
             
-            // Extract hour and minute for easier time comparisons
+            let timeData = {};
+            let apiSuccess = false;
+            
+            if (!apiSuccess) {
+                try {
+                    const worldTimeUrl = `http://worldtimeapi.org/api/timezone/Etc/UTC`;
+                    const worldTimeRes = await axios.get(worldTimeUrl, { timeout: 3000 });
+                    
+                    if (worldTimeRes && worldTimeRes.data) {
+                        // We have UTC time, now need to determine local offset
+                        let utcOffset = 0;
+                        let timezoneName = 'UTC';
+                        let tzSource = 'geographic_calculation';
+                        
+                        // Use country-based timezone if available
+                        if (country && COUNTRY_TIMEZONE_MAP[country]) {
+                            const tzInfo = COUNTRY_TIMEZONE_MAP[country];
+                            utcOffset = tzInfo.offset;
+                            timezoneName = tzInfo.name;
+                            tzSource = 'country_mapping';
+                            console.log(`[Timezone] Using ${country} mapping: ${timezoneName} (UTC${utcOffset >= 0 ? '+' : ''}${utcOffset})`);
+                        } else {
+                            if (lat >= 3 && lat <= 14 && lon >= 3 && lon <= 15) {
+                                utcOffset = 1;
+                                timezoneName = 'WAT';
+                                tzSource = 'geographic_region';
+                            } else if (lat >= -5 && lat <= 5 && lon >= -20 && lon <= 20) {
+                                // Central Africa
+                                if (lon < 7) {
+                                    utcOffset = 0; // GMT
+                                    timezoneName = 'GMT';
+                                } else {
+                                    utcOffset = 1; // WAT
+                                    timezoneName = 'WAT';
+                                }
+                                tzSource = 'geographic_region';
+                            } else {
+                                // Fallback to longitude-based (15° per hour)
+                                utcOffset = Math.round(lon / 15);
+                                timezoneName = `UTC${utcOffset >= 0 ? '+' : ''}${utcOffset}`;
+                                tzSource = 'longitude_estimate';
+                            }
+                        }
+                        
+                        const utcTime = new Date(worldTimeRes.data.datetime);
+                        const localTime = new Date(utcTime.getTime() + utcOffset * 60 * 60 * 1000);
+                        
+                        timeData = {
+                            timezone: timezoneName,
+                            current_time: localTime.toISOString(),
+                            current_date: localTime.toISOString().split('T')[0],
+                            utc_offset: `UTC${utcOffset >= 0 ? '+' : ''}${utcOffset}`,
+                            is_dst: false,
+                            timezone_source: tzSource
+                        };
+                        apiSuccess = true;
+                        console.log(`[WorldTimeAPI] Success!`);
+                    }
+                } catch (worldTimeErr) {
+                    console.log(`[WorldTimeAPI] Failed: ${worldTimeErr.message}`);
+                }
+            }
+
+            if (!apiSuccess) {
+                try {
+                    const timezoneUrl = `https://timeapi.io/api/timezone/coordinate?latitude=${lat}&longitude=${lon}`;
+                    const timezoneRes = await axios.get(timezoneUrl, { timeout: 3000 });
+                    
+                    if (timezoneRes && timezoneRes.data) {
+                        const data = timezoneRes.data;
+                        timeData = {
+                            timezone: data.timeZone,
+                            current_time: data.currentLocalTime,
+                            current_date: data.currentUtcOffset?.seconds ? new Date(Date.now() + data.currentUtcOffset.seconds * 1000).toISOString().split('T')[0] : null,
+                            utc_offset: data.currentUtcOffset?.label || data.currentUtcOffset,
+                            is_dst: data.dstActive || false,
+                            timezone_source: 'timeapi.io'
+                        };
+                        apiSuccess = true;
+                        console.log(`[TimeAPI.io] Success!`);
+                    }
+                } catch (timeApiErr) {
+                    console.log(`[TimeAPI.io] Failed: ${timeApiErr.message}`);
+                }
+            }
+            
+            if (!apiSuccess) {
+                try {
+                    const timezoneDbUrl = `http://api.timezonedb.com/v2.1/get-time-zone?key=demo&format=json&by=position&lat=${lat}&lng=${lon}`;
+                    const tzDbRes = await axios.get(timezoneDbUrl, { timeout: 3000 });
+                    
+                    if (tzDbRes && tzDbRes.data && tzDbRes.data.status === 'OK') {
+                        const data = tzDbRes.data;
+                        const utcOffset = data.gmtOffset / 3600; // Convert seconds to hours
+                        timeData = {
+                            timezone: data.abbreviation || data.zoneName,
+                            current_time: new Date(data.timestamp * 1000).toISOString(),
+                            current_date: data.formatted.split(' ')[0],
+                            utc_offset: `UTC${utcOffset >= 0 ? '+' : ''}${utcOffset}`,
+                            is_dst: data.dst === "1",
+                            timezone_source: 'timezonedb.com'
+                        };
+                        apiSuccess = true;
+                        console.log(`[TimezoneDB] Success!`);
+                    }
+                } catch (tzDbErr) {
+                    console.log(`[TimezoneDB] Failed: ${tzDbErr.message}`);
+                }
+            }
+
+            if (!apiSuccess) {
+                try {
+                    const geoNamesUrl = `http://api.geonames.org/timezoneJSON?lat=${lat}&lng=${lon}&username=demo`;
+                    const geoNamesRes = await axios.get(geoNamesUrl, { timeout: 3000 });
+                    
+                    if (geoNamesRes && geoNamesRes.data && geoNamesRes.data.time) {
+                        const data = geoNamesRes.data;
+                        const utcOffset = data.rawOffset + (data.dstOffset || 0);
+                        timeData = {
+                            timezone: data.timezoneId || 'Unknown',
+                            current_time: data.time,
+                            current_date: data.time.split(' ')[0],
+                            utc_offset: `UTC${utcOffset >= 0 ? '+' : ''}${utcOffset}`,
+                            is_dst: (data.dstOffset || 0) !== 0,
+                            timezone_source: 'geonames.org'
+                        };
+                        apiSuccess = true;
+                        console.log(`[GeoNames] Success!`);
+                    }
+                } catch (geoNamesErr) {
+                    console.log(`[GeoNames] Failed: ${geoNamesErr.message}`);
+                }
+            }
+            
+            if (!apiSuccess) {
+                try {
+                    const worldClockUrl = `http://worldclockapi.com/api/json/utc/now`;
+                    const worldClockRes = await axios.get(worldClockUrl, { timeout: 3000 });
+                    
+                    if (worldClockRes && worldClockRes.data && worldClockRes.data.currentDateTime) {
+                        let utcOffset = 0;
+                        let timezoneName = 'UTC';
+                        
+                        if (country && COUNTRY_TIMEZONE_MAP[country]) {
+                            const tzInfo = COUNTRY_TIMEZONE_MAP[country];
+                            utcOffset = tzInfo.offset;
+                            timezoneName = tzInfo.name;
+                        } else if (lat >= 3 && lat <= 14 && lon >= 3 && lon <= 15) {
+                            utcOffset = 1;
+                            timezoneName = 'WAT';
+                        } else {
+                            utcOffset = Math.round(lon / 15);
+                            timezoneName = `UTC${utcOffset >= 0 ? '+' : ''}${utcOffset}`;
+                        }
+                        
+                        const utcTime = new Date(worldClockRes.data.currentDateTime);
+                        const localTime = new Date(utcTime.getTime() + utcOffset * 60 * 60 * 1000);
+                        
+                        timeData = {
+                            timezone: timezoneName,
+                            current_time: localTime.toISOString(),
+                            current_date: localTime.toISOString().split('T')[0],
+                            utc_offset: `UTC${utcOffset >= 0 ? '+' : ''}${utcOffset}`,
+                            is_dst: false,
+                            timezone_source: 'worldclockapi.com'
+                        };
+                        apiSuccess = true;
+                        console.log(`[WorldClockAPI] Success!`);
+                    }
+                } catch (worldClockErr) {
+                    console.log(`[WorldClockAPI] Failed: ${worldClockErr.message}`);
+                }
+            }
+            
+            if (!apiSuccess) {
+                let utcOffset = 0;
+                let timezoneName = 'UTC';
+                
+                if (country && COUNTRY_TIMEZONE_MAP[country]) {
+                    const tzInfo = COUNTRY_TIMEZONE_MAP[country];
+                    utcOffset = tzInfo.offset;
+                    timezoneName = tzInfo.name;
+                    console.log(`[Fallback] Using ${country} mapping: ${timezoneName}`);
+                } else if (lat >= 3 && lat <= 14 && lon >= 3 && lon <= 15) {
+                    utcOffset = 1;
+                    timezoneName = 'WAT';
+                    console.log(`[Fallback] Geographic detection: West Africa (WAT)`);
+                } else {
+                    utcOffset = Math.round(lon / 15);
+                    timezoneName = `UTC${utcOffset >= 0 ? '+' : ''}${utcOffset}`;
+                    console.log(`[Fallback] Using longitude estimate: ${timezoneName}`);
+                }
+                
+                const now = new Date();
+                const localTime = new Date(now.getTime() + utcOffset * 60 * 60 * 1000);
+                
+                timeData = {
+                    timezone: timezoneName,
+                    current_time: localTime.toISOString(),
+                    current_date: localTime.toISOString().split('T')[0],
+                    utc_offset: `UTC${utcOffset >= 0 ? '+' : ''}${utcOffset}`,
+                    is_dst: false,
+                    timezone_source: 'fallback',
+                    note: "Using fallback timezone detection - may not account for DST"
+                };
+            }
+            
             const timeStr = timeData.current_time;
             let hour = 0, minute = 0;
             if (timeStr) {
@@ -748,6 +989,32 @@ const functions = {
                 }
             }
             
+            let utcHour = hour, utcMinute = minute;
+            let offsetHours = 0;
+            
+            if (timeData.utc_offset) {
+                if (typeof timeData.utc_offset === 'object' && timeData.utc_offset.seconds) {
+                    offsetHours = timeData.utc_offset.seconds / 3600;
+                } else if (typeof timeData.utc_offset === 'string') {
+                    const offsetMatch = timeData.utc_offset.match(/UTC([+-]?\d+(?:\.\d+)?)/);
+                    if (offsetMatch) {
+                        offsetHours = parseFloat(offsetMatch[1]);
+                    }
+                } else if (typeof timeData.utc_offset === 'number') {
+                    offsetHours = timeData.utc_offset;
+                }
+            }
+
+            const localTotalMinutes = hour * 60 + minute;
+            const offsetMinutes = offsetHours * 60;
+            let utcTotalMinutes = localTotalMinutes - offsetMinutes;
+
+            if (utcTotalMinutes < 0) utcTotalMinutes += 24 * 60;
+            if (utcTotalMinutes >= 24 * 60) utcTotalMinutes -= 24 * 60;
+            
+            utcHour = Math.floor(utcTotalMinutes / 60);
+            utcMinute = Math.floor(utcTotalMinutes % 60);
+            
             return {
                 verified: true,
                 ...timeData,
@@ -755,6 +1022,10 @@ const functions = {
                 time_24hr: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
                 hour: hour,
                 minute: minute,
+                utc_time_24hr: `${utcHour.toString().padStart(2, '0')}:${utcMinute.toString().padStart(2, '0')}`,
+                utc_hour: utcHour,
+                utc_minute: utcMinute,
+                offset_hours: offsetHours,
                 coordinates: { latitude: lat, longitude: lon }
             };
             
@@ -814,12 +1085,22 @@ function parseDERSignature(signatureHex) {
     }
 }
 
-async function runGatekeeper(rule, user_data, modelIndex = 0) {
-    if (modelIndex >= MODELS.length) throw new Error("All AI Models failed.");
+async function runGatekeeper(rule, user_data, modelIndex = 0, keyIndex = 0) {
+    if (keyIndex >= GEN_AI_KEYS.length) {
+        throw new Error("All AI Models and API Keys exhausted.");
+    }
+
+    if (modelIndex >= MODELS.length) {
+        console.warn(`[Gatekeeper] All models failed with API Key #${keyIndex + 1}. Trying next key...`);
+        return runGatekeeper(rule, user_data, 0, keyIndex + 1); 
+    }
+    
     const currentModelName = MODELS[modelIndex];
+    const currentApiKey = GEN_AI_KEYS[keyIndex];
 
     try {
-        const genAI = new GoogleGenerativeAI(GEN_AI_KEY);
+        const genAI = new GoogleGenerativeAI(currentApiKey);
+        console.log(`[Gatekeeper] Using API Key #${keyIndex + 1}, Model: ${currentModelName}`);
         const model = genAI.getGenerativeModel({
             model: currentModelName,
             tools: [{ functionDeclarations: toolsDefinition }]
@@ -866,8 +1147,11 @@ async function runGatekeeper(rule, user_data, modelIndex = 0) {
         (Examples: "Must own a Pudgy Penguin", "Must own ENS", "Hold BAYC")
         ---------------------------------------------------------
         USE TOOL: 'check_nft_ownership'
-        - If the rule mentions a specific name (e.g., "Pudgy Penguin"), pass it as 'collectionName'.
+        - If the rule mentions a specific name (e.g., "Pudgy Penguin"), pass it as 'collectionName' ONLY.
+        - DO NOT specify 'chain' parameter for known collections - the system will automatically use the correct mainnet chain.
+        - Only specify 'chain' if the rule explicitly says "on Sepolia testnet" or similar.
         - If the rule gives a 0x address, pass it as 'contractAddress'.
+        - Call this tool ONCE per NFT collection, not multiple times across different chains.
 
         TYPE E: SOCIAL & WEB2 (Mocked)
         (Examples: "Follow on Twitter", "Star GitHub repo", "Spotify Listener")
@@ -886,14 +1170,16 @@ async function runGatekeeper(rule, user_data, modelIndex = 0) {
         USE TOOL: 'check_sybil_geo_real'
 
         TYPE H: TIME & TIMEZONE CHECKS
-        (Examples: "Can only claim after 7:50PM", "Must be before midnight", "Only on weekends", "Must be in Lagos at 8PM")
+        (Examples: "Can only claim after 7:50PM", "Must be before midnight", "Only on weekends", "Must be in Lagos at 8PM", "2:32 PM UTC+0")
         ---------------------------------------------------------
         USE TOOL: 'check_time_timezone'
-        - For time requirements, check the user's LOCAL TIME based on their GPS coordinates
-        - Compare 'hour' and 'minute' fields from the tool response
+        - For LOCAL time requirements (no timezone specified), use 'hour' and 'minute' fields
+        - For UTC/specific timezone requirements (e.g., "2:32 PM UTC+0"), use 'utc_hour' and 'utc_minute' fields
+        - The tool returns BOTH local time (hour, minute) AND UTC time (utc_hour, utc_minute)
+        - For grace period requirements (e.g., "± 3 mins"), calculate if the time is within range
+        - Example: "2:32 PM UTC+0 ± 3 mins" means utc_hour == 14 AND utc_minute >= 29 AND utc_minute <= 35
         - For location + time (e.g., "in Lagos after 7:50PM"), check BOTH 'city' matches AND time requirements
-        - The tool returns: timezone, current_time, hour, minute, city, country
-        - Example: "after 7:50PM" means hour >= 19 AND (hour > 19 OR minute >= 50)
+        - Example: "after 7:50PM local" means hour >= 19 AND (hour > 19 OR minute >= 50)
 
         ### HALLUCINATION GUARD:
         - NEVER call a tool for Trivia (e.g. "What is 2+2?").
@@ -916,67 +1202,242 @@ async function runGatekeeper(rule, user_data, modelIndex = 0) {
         let result = await chat.sendMessage(prompt);
         let call = result.response.functionCalls()?.[0];
         let turns = 0;
-        while (call && turns < 5) {
+        const toolResults = []; 
+        const MAX_TURNS = 12; 
+        
+        while (turns < MAX_TURNS) {
             turns++;
-            const fn = functions[call.name];
-            if (fn) {
-                console.log(`[Gatekeeper] 🤖 Calling Tool: ${call.name}`);
-                const toolArgs = { ...call.args };
+            
+            // Check if there's a function call to process
+            if (call) {
+                const fn = functions[call.name];
+                if (fn) {
+                    console.log(`[Gatekeeper] 🤖 Calling Tool: ${call.name} (Turn ${turns}/${MAX_TURNS})`);
+                    const toolArgs = { ...call.args };
 
-                if (!toolArgs.address && user_data.address) {
-                    toolArgs.address = user_data.address;
-                }
+                    if (!toolArgs.address && user_data.address) {
+                        toolArgs.address = user_data.address;
+                    }
 
-                if (call.name === 'check_sybil_geo_real') {
-                    if (!toolArgs.latitude) toolArgs.latitude = user_data.latitude;
-                    if (!toolArgs.longitude) toolArgs.longitude = user_data.longitude;
-                }
+                    if (call.name === 'check_sybil_geo_real') {
+                        if (!toolArgs.latitude) toolArgs.latitude = user_data.latitude;
+                        if (!toolArgs.longitude) toolArgs.longitude = user_data.longitude;
+                    }
 
-                if (call.name === 'check_time_timezone') {
-                    if (!toolArgs.latitude) toolArgs.latitude = user_data.latitude;
-                    if (!toolArgs.longitude) toolArgs.longitude = user_data.longitude;
-                }
+                    if (call.name === 'check_time_timezone') {
+                        if (!toolArgs.latitude) toolArgs.latitude = user_data.latitude;
+                        if (!toolArgs.longitude) toolArgs.longitude = user_data.longitude;
+                    }
 
-                if (call.name === 'check_discord_membership') {
-                    if (!toolArgs.userId) toolArgs.userId = user_data.discordId;
-                    if (!toolArgs.guildId) {
-                        const idMatch = rule.match(/\b\d{17,19}\b/);
+                    if (call.name === 'check_discord_membership') {
+                        if (!toolArgs.userId) toolArgs.userId = user_data.discordId;
+                        if (!toolArgs.guildId) {
+                            const idMatch = rule.match(/\b\d{17,19}\b/);
 
-                        if (idMatch) {
-                            toolArgs.guildId = idMatch[0];
-                        } else {
-                            toolArgs.guildId = "1322709977826529321";
+                            if (idMatch) {
+                                toolArgs.guildId = idMatch[0];
+                            } else {
+                                toolArgs.guildId = "1322709977826529321";
+                            }
                         }
                     }
-                }
 
-                const output = await fn(toolArgs);
-                console.log(`[Gatekeeper] Tool Output:`, JSON.stringify(output).substring(0, 500));
-                result = await chat.sendMessage([{ functionResponse: { name: call.name, response: { content: output } } }]);
-                call = result.response.functionCalls()?.[0];
+                    const output = await fn(toolArgs);
+                    console.log(`[Gatekeeper] Tool Output:`, JSON.stringify(output).substring(0, 500));
+                    
+                    toolResults.push({ tool: call.name, args: toolArgs, result: output });
+                    
+                    result = await chat.sendMessage([{ functionResponse: { name: call.name, response: { content: output } } }]);
+                    call = result.response.functionCalls()?.[0];
+                    
+                    if (!call) {
+                        const currentResponse = result.response.text();
+                        if (!currentResponse || currentResponse.trim() === '') {
+                            console.warn(`[Gatekeeper] Empty response after tool call. Prompting to continue...`);
+                            
+
+                            result = await chat.sendMessage(
+                                `You just received tool results. The original rule was: "${rule}"\n` +
+                                `Tools called so far: ${toolResults.map(t => t.tool).join(', ')}\n` +
+                                `If there are MORE criteria to check, call the appropriate tool NOW.\n` +
+                                `If ALL criteria have been checked, provide your final JSON decision: {"approved": boolean, "explanation": "..."}`
+                            );
+                            call = result.response.functionCalls()?.[0];
+                            
+                            if (!call && (!result.response.text() || result.response.text().trim() === '')) {
+                                console.warn(`[Gatekeeper] AI stuck. Continuing recovery loop...`);
+                            }
+                        }
+                    }
+                } else {
+                    console.warn(`[Gatekeeper] Unknown tool: ${call.name}`);
+                    break;
+                }
             } else {
-                break;
+                const currentResponse = result.response.text();
+                if (currentResponse && currentResponse.trim() !== '') {
+                    break;
+                }
+                console.warn(`[Gatekeeper] No tool call and empty response at turn ${turns}. Attempting recovery...`);
+                
+                if (turns <= 2) {
+                    result = await chat.sendMessage(
+                        `You must evaluate the rule: "${rule}"\n` +
+                        `Start by calling the appropriate verification tools. Do not respond until all criteria are checked.`
+                    );
+                    call = result.response.functionCalls()?.[0];
+                } else {
+                    break; 
+                }
             }
         }
         
-        // After all tools complete, get the final AI response
         let responseText = result.response.text();
         console.log(`[Gatekeeper] Raw AI Response:`, responseText);
+        console.log(`[Gatekeeper] Completed ${turns} turns with ${toolResults.length} tool calls`);
         
-        // If response is empty after tool calls, prompt for final decision
         if (!responseText || responseText.trim() === '') {
-            console.warn(`[Gatekeeper] Empty response after ${turns} tool calls. Requesting final decision...`);
-            result = await chat.sendMessage('Based on the tool results above, provide your final decision in JSON format: {"approved": boolean, "explanation": "..."}');
-            responseText = result.response.text();
-            console.log(`[Gatekeeper] Follow-up AI Response:`, responseText);
+            console.warn(`[Gatekeeper] Empty response after ${turns} turns, ${toolResults.length} tool calls. Starting recovery...`);
+            console.log(`[Gatekeeper] Tools called:`, toolResults.map(t => `${t.tool}(${JSON.stringify(t.args).substring(0, 50)}...)`).join(', '));
+            
+            const followUpPrompts = [
+                `The original rule is: "${rule}"\n` +
+                `You have called ${toolResults.length} tools. Here are ALL the results:\n` +
+                toolResults.map((t, i) => `${i + 1}. ${t.tool}: ${JSON.stringify(t.result)}`).join('\n') + '\n' +
+                `Based on these results, does the user meet ALL criteria? Respond with JSON: {"approved": boolean, "explanation": "..."}`,
+                
+                'You must respond with a JSON decision NOW. Analyze all tool results and decide. {"approved": true/false, "explanation": "..."}',
+                
+                'RESPOND NOW. JSON ONLY: {"approved": false, "explanation": "Verification incomplete"}'
+            ];
+            
+            for (let i = 0; i < followUpPrompts.length; i++) {
+                try {
+                    console.log(`[Gatekeeper] Retry attempt ${i + 1}/3...`);
+                    result = await chat.sendMessage(followUpPrompts[i]);
+                    responseText = result.response.text();
+                    console.log(`[Gatekeeper] Retry ${i + 1} Response:`, responseText);
+                    
+                    if (responseText && responseText.trim() !== '') {
+                        break;
+                    }
+                    
+                    // Small delay between retries
+                    await new Promise(r => setTimeout(r, 500));
+                } catch (retryErr) {
+                    console.warn(`[Gatekeeper] Retry ${i + 1} failed: ${retryErr.message}`);
+                }
+            }
+            
+            if (!responseText || responseText.trim() === '') {
+                console.warn(`[Gatekeeper] All AI retries failed. Making programmatic decision from ${toolResults.length} tool results...`);
+                
+                let allChecksPassed = true;
+                let failureReasons = [];
+                let successCount = 0;
+                
+                // Analyze ALL tool results for multi-criteria evaluation
+                for (const tr of toolResults) {
+                    const r = tr.result;
+                    const tool = tr.tool;
+                    
+                    console.log(`[Gatekeeper] Analyzing ${tool}:`, JSON.stringify(r).substring(0, 200));
+                    
+                    // Check for explicit errors
+                    if (r.error) {
+                        allChecksPassed = false;
+                        failureReasons.push(`${tool}: ${r.error}`);
+                        continue;
+                    }
+                    
+                    // EVM Stats checks
+                    if (tool === 'check_evm_stats') {
+                        const balance = parseFloat(r.balance_eth || 0);
+                        const gasSpent = parseFloat(r.lifetime_gas_eth || 0);
+                        const daysSinceActive = r.days_since_active;
+                        
+                        if (balance >= 0) successCount++;
+                    }
+                    
+                    // Token balance checks
+                    if (tool === 'check_token_balance') {
+                        const balance = parseFloat(r.balance || 0);
+                        if (balance > 0) successCount++;
+                    }
+                    
+                    if (tool === 'check_nft_ownership') {
+                        if (r.owns_nft === false) {
+                            const ruleUpper = rule.toUpperCase();
+                            const collectionName = (r.collection || '').toUpperCase();
+                            if (ruleUpper.includes('NOT') && ruleUpper.includes(collectionName)) {
+                                successCount++;
+                            } else {
+                                allChecksPassed = false;
+                                failureReasons.push(`Does not own required NFT: ${r.collection}`);
+                            }
+                        } else if (r.owns_nft === true) {
+                            const ruleUpper = rule.toUpperCase();
+                            const collectionName = (r.collection || '').toUpperCase();
+                            if (ruleUpper.includes('NOT') && ruleUpper.includes(collectionName)) {
+                                allChecksPassed = false;
+                                failureReasons.push(`Must NOT own ${r.collection} but user owns it`);
+                            } else {
+                                successCount++;
+                            }
+                        }
+                    }
+                    
+                    if (tool === 'check_discord_membership') {
+                        if (r.is_member === false) {
+                            allChecksPassed = false;
+                            failureReasons.push('Not a member of required Discord server');
+                        } else if (r.is_member === true) {
+                            successCount++;
+                        }
+                    }
+                    
+                    if (tool === 'check_time_timezone') {
+                        if (r.verified === true) successCount++;
+                        else if (r.verified === false) {
+                            allChecksPassed = false;
+                            failureReasons.push('Time/location requirement not met');
+                        }
+                    }
+                    
+                    if (tool === 'check_sybil_geo_real') {
+                        if (r.is_sybil === true) {
+                            allChecksPassed = false;
+                            failureReasons.push('Flagged as potential sybil');
+                        } else if (r.verified === false) {
+                            allChecksPassed = false;
+                            failureReasons.push('Location/identity verification failed');
+                        } else if (r.verified === true) {
+                            successCount++;
+                        }
+                    }
+                }
+                
+                // Final decision
+                const inferredApproval = allChecksPassed && successCount > 0;
+                const inferredExplanation = inferredApproval 
+                    ? `All ${successCount} verification checks passed` 
+                    : (failureReasons.length > 0 ? failureReasons.join('; ') : 'Verification incomplete - some checks may have failed');
+                
+                console.log(`[Gatekeeper] Programmatic decision: approved=${inferredApproval}, reasons: ${inferredExplanation}`);
+                responseText = JSON.stringify({ approved: inferredApproval, explanation: inferredExplanation });
+            }
+            
+            if (!responseText || responseText.trim() === '') {
+                throw new Error("Empty response after all recovery attempts - triggering model failover");
+            }
         }
         
         responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
         return responseText;
 
     } catch (e) {
-        console.warn(`Model ${currentModelName} failed: ${e.message}`);
-        return runGatekeeper(rule, user_data, modelIndex + 1);
+        console.warn(`[Gatekeeper] Model ${currentModelName} (Key #${keyIndex + 1}) failed: ${e.message}`);
+        return runGatekeeper(rule, user_data, modelIndex + 1, keyIndex);
     }
 }
 
@@ -986,44 +1447,105 @@ function parseAIResponse(text) {
         return { approved: false, explanation: "AI returned empty response. Please try again." };
     }
     
-    let clean = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    console.log("[Parse] Raw response text:", text);
+    
+    let clean = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    
+    // Try multiple JSON extraction strategies
+    let jsonObject = null;
+    
+    try {
+        jsonObject = JSON.parse(clean);
+        console.log("[Parse] Success: Direct JSON parse");
+        return jsonObject;
+    } catch (e) {
+        console.log("[Parse] Strategy 1 failed - not direct JSON");
+    }
+    
     const start = clean.indexOf('{');
     const end = clean.lastIndexOf('}');
     
-    if (start === -1 || end === -1) {
-        console.warn("[Parse] No JSON found in AI response:", text.substring(0, 200));
-        // Try to infer from text
-        const lowerText = text.toLowerCase();
-        if (lowerText.includes('approved') && lowerText.includes('true')) {
-            return { approved: true, explanation: "Verification passed (inferred from text)" };
-        }
-        return { approved: false, explanation: "Could not parse AI response. Please try again." };
-    }
-
-    clean = clean.substring(start, end + 1);
-
-    try {
-        return JSON.parse(clean);
-    } catch (e) {
+    if (start !== -1 && end !== -1 && start < end) {
+        const extracted = clean.substring(start, end + 1);
         try {
-            return new Function("return " + clean)();
-        } catch (e2) {
-            console.error("[Parse] Critical Parse Error. Raw AI Text:", text.substring(0, 300));
-            // Final fallback - try to infer approval
-            const lowerText = text.toLowerCase();
-            if (lowerText.includes('"approved": true') || lowerText.includes('"approved":true')) {
-                return { approved: true, explanation: "Parsed from partial response" };
-            }
-            return { approved: false, explanation: "Response parsing failed" };
+            jsonObject = JSON.parse(extracted);
+            console.log("[Parse] Success: Extracted JSON from text");
+            return jsonObject;
+        } catch (e) {
+            console.log("[Parse] Strategy 2 failed - extracted text not valid JSON");
         }
     }
+    
+    const jsonMatch = clean.match(/\{[\s\S]*"approved"\s*:\s*(true|false)[\s\S]*\}/);
+    if (jsonMatch) {
+        try {
+            jsonObject = JSON.parse(jsonMatch[0]);
+            console.log("[Parse] Success: Regex-extracted JSON");
+            return jsonObject;
+        } catch (e) {
+            console.log("[Parse] Strategy 3 failed - regex match not valid JSON");
+        }
+    }
+    
+    console.warn("[Parse] All JSON parsing failed. Attempting intelligent inference...");
+    console.warn("[Parse] Full text:", text.substring(0, 500));
+    
+    const lowerText = text.toLowerCase();
+    
+    if (lowerText.includes('"approved": true') || 
+        lowerText.includes('"approved":true') ||
+        lowerText.includes('approved: true') ||
+        (lowerText.includes('approved') && lowerText.includes('true'))) {
+        
+        let explanation = "Verification passed";
+        const explMatch = text.match(/"explanation"\s*:\s*"([^"]*)"/i);
+        if (explMatch && explMatch[1]) {
+            explanation = explMatch[1];
+        }
+        
+        console.log("[Parse] Inferred APPROVAL from text");
+        return { approved: true, explanation };
+    }
+    
+    if (lowerText.includes('"approved": false') || 
+        lowerText.includes('"approved":false') ||
+        lowerText.includes('approved: false')) {
+        
+        let explanation = "Condition not met";
+        const explMatch = text.match(/"explanation"\s*:\s*"([^"]*)"/i);
+        if (explMatch && explMatch[1]) {
+            explanation = explMatch[1];
+        }
+        
+        console.log("[Parse] Inferred REJECTION from text");
+        return { approved: false, explanation };
+    }
+    
+    const approvalWords = ['granted', 'approved', 'verified', 'passed', 'success', 'yes'];
+    const rejectionWords = ['denied', 'rejected', 'failed', 'incorrect', 'wrong', 'no'];
+    
+    const hasApproval = approvalWords.some(word => lowerText.includes(word));
+    const hasRejection = rejectionWords.some(word => lowerText.includes(word));
+    
+    if (hasApproval && !hasRejection) {
+        console.log("[Parse] Inferred APPROVAL from keywords");
+        return { approved: true, explanation: "Verification passed (inferred from response)" };
+    }
+    
+    if (hasRejection || !hasApproval) {
+        console.log("[Parse] Inferred REJECTION from keywords or lack of approval");
+        return { approved: false, explanation: "Condition not met. Please verify your details." };
+    }
+    
+    console.error("[Parse] Complete parsing failure. Defaulting to REJECT for security.");
+    return { approved: false, explanation: "Unable to verify. Please try again." };
 }
 
 app.post('/api/verify', async (req, res) => {
     try {
         const { rule, user_data } = req.body;
         const decisionText = await runGatekeeper(rule, user_data);
-        console.log("AI Output:", decisionText); // Helpful debug log
+        console.log("AI Output:", decisionText); 
         let decision = parseAIResponse(decisionText);
         if (!decision) {
             console.warn("AI Response unreadable. Defaulting to fallback.");
@@ -1067,17 +1589,25 @@ app.post('/api/claim', async (req, res) => {
         let bioHashArray;
 
         if (biometricData && biometricData.signature) {
-            console.log("Real Biometric Data Detected. Parsing...");
+            console.log("Real Biometric Data Detected. Processing...");
             try {
-                const parsedSigBuffer = parseDERSignature(biometricData.signature);
-                bioSigArray = Array.from(parsedSigBuffer);
-                const clientDataHash = crypto.createHash('sha256').update(biometricData.clientDataJSON || '').digest();
+                bioSigArray = Array.isArray(biometricData.signature) 
+                    ? biometricData.signature 
+                    : Array.from(Buffer.from(biometricData.signature, 'hex'));
+                
+                if (bioSigArray.length !== 64) {
+                    throw new Error(`Expected 64-byte signature, got ${bioSigArray.length}`);
+                }
+
+                const clientDataHash = crypto.createHash('sha256').update(
+                    Buffer.from(biometricData.clientDataJSON || [])
+                ).digest();
                 bioHashArray = Array.from(clientDataHash);
 
-                console.log("Biometric Signature Parsed (64 bytes)");
+                console.log(`Biometric Signature Ready (${bioSigArray.length} bytes)`);
 
             } catch (e) {
-                console.error("Biometric Parse Failed:", e.message);
+                console.error("Biometric Processing Failed:", e.message);
                 throw new Error("Invalid Passkey Signature Format");
             }
         }
@@ -1145,8 +1675,6 @@ app.get('/api/check-claim/:dropId', async (req, res) => {
         const expiresAt = BigInt(expiresHex);
         const gatekeeper = ethers.getAddress(gatekeeperHex);
 
-        // Silenced the drop status check
-        // console.log(`Drop ${dropId}: active=${isActive}, expires=${expiresAt}, sender=${sender}`);
         let claimedBy = null;
         let reclaimed = false;
 
@@ -1182,7 +1710,7 @@ app.get('/api/check-claim/:dropId', async (req, res) => {
 
 const SERVER_PORT = process.env.PORT || 4000;
 app.get('/api/auth/discord', (req, res) => {
-    const scope = 'identify'; // We only need their ID/Username
+    const scope = 'identify'; 
     const url = `https://discord.com/api/oauth2/authorize?client_id=${process.env.DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.DISCORD_REDIRECT_URI)}&response_type=code&scope=${scope}`;
     res.redirect(url);
 });
