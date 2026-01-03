@@ -8,10 +8,9 @@ const crypto = require('crypto');
 const verifiedSessions = new Map();
 const app = express();
 const ALLOWED_ORIGINS = [
+    'https://stylus-link.vercel.app',
     'http://localhost:3001',
-    'http://localhost:3000',
-    /\.vercel\.app$/,
-    /styluslink.*\.vercel\.app$/
+    'http://localhost:3000'
 ];
 
 app.use((req, res, next) => {
