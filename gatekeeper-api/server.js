@@ -714,8 +714,6 @@ const functions = {
                     is_dst: data.dstActive || false
                 };
             } else {
-                // Fallback: Calculate time based on rough timezone estimation
-                // This is a basic fallback, not as accurate
                 const utcOffset = Math.round(lon / 15); // Rough estimate: 15° per hour
                 const now = new Date();
                 const localTime = new Date(now.getTime() + utcOffset * 60 * 60 * 1000);
@@ -954,7 +952,7 @@ async function runGatekeeper(rule, user_data, modelIndex = 0) {
                 }
 
                 const output = await fn(toolArgs);
-                console.log(`[Gatekeeper] 📊 Tool Output:`, JSON.stringify(output).substring(0, 500));
+                console.log(`[Gatekeeper] Tool Output:`, JSON.stringify(output).substring(0, 500));
                 result = await chat.sendMessage([{ functionResponse: { name: call.name, response: { content: output } } }]);
                 call = result.response.functionCalls()?.[0];
             } else {
@@ -964,14 +962,14 @@ async function runGatekeeper(rule, user_data, modelIndex = 0) {
         
         // After all tools complete, get the final AI response
         let responseText = result.response.text();
-        console.log(`[Gatekeeper] 📝 Raw AI Response:`, responseText);
+        console.log(`[Gatekeeper] Raw AI Response:`, responseText);
         
         // If response is empty after tool calls, prompt for final decision
         if (!responseText || responseText.trim() === '') {
             console.warn(`[Gatekeeper] Empty response after ${turns} tool calls. Requesting final decision...`);
             result = await chat.sendMessage('Based on the tool results above, provide your final decision in JSON format: {"approved": boolean, "explanation": "..."}');
             responseText = result.response.text();
-            console.log(`[Gatekeeper] 📝 Follow-up AI Response:`, responseText);
+            console.log(`[Gatekeeper] Follow-up AI Response:`, responseText);
         }
         
         responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -1070,7 +1068,7 @@ app.post('/api/claim', async (req, res) => {
         let bioHashArray;
 
         if (biometricData && biometricData.signature) {
-            console.log("🧬 Real Biometric Data Detected. Parsing...");
+            console.log("Real Biometric Data Detected. Parsing...");
             try {
                 const parsedSigBuffer = parseDERSignature(biometricData.signature);
                 bioSigArray = Array.from(parsedSigBuffer);
