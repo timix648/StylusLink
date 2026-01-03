@@ -17,6 +17,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import CreateDrop from '../components/CreateDrop';
 import QuestCard from '../components/QuestCard';
 import QuestDrawer from '../components/QuestDrawer';
+import { BiometricPad } from '../components/tools/BiometricPad';
 import { useWallet } from '../components/WalletContext';
 
 const API_URL = process.env.NEXT_PUBLIC_GATEKEEPER_URL || "http://localhost:4000/api";
@@ -42,6 +43,8 @@ function GatekeeperApp() {
     const [userAddress, setUserAddress] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
     const [isMobile, setIsMobile] = useState(false);
+    const [showBiometric, setShowBiometric] = useState(false);
+    const [biometricChallenge, setBiometricChallenge] = useState("");
 
     useEffect(() => {
         setMounted(true);
@@ -174,37 +177,26 @@ function GatekeeperApp() {
             return;
         }
 
-        setClaimStep('processing');
+        // Generate challenge for biometric signature
+        const challenge = ethers.solidityPackedKeccak256(
+            ["uint256", "address"],
+            [dropId, addr]
+        );
+        
+        setUserAddress(addr);
+        setBiometricChallenge(challenge);
+        setShowBiometric(true);
+        setClaimStep('biometric_scan');
+    };
 
-        try {
-            const res = await axios.post(`${API_URL}/claim`, {
-                dropId,
-                receiver: addr,
-                proofToken: proofToken,
-                biometricData: {
-                    mock: true,
-                    signature: "0x30440220000000000000000000000000000000000000000000000000000000000000000102200000000000000000000000000000000000000000000000000000000000000001"
-                }
-            }, {
-                headers: { 'ngrok-skip-browser-warning': '1' }
-            });
+    const handleBiometricSuccess = () => {
+        setShowBiometric(false);
+        setClaimStep('success');
 
-            if (res.data.success) {
-                setClaimStep('success');
-
-                setTimeout(() => {
-                    setIsClaimed(true);
-                    setClaimStep('claimed_already');
-                }, 5000);
-            } else {
-                throw new Error(res.data.error || "Server rejected claim");
-            }
-
-        } catch (e: any) {
-            console.error("Claim Error:", e);
-            setErrorMsg(e.response?.data?.error || "Claim Transaction Failed");
-            setClaimStep('wallet_input'); 
-        }
+        setTimeout(() => {
+            setIsClaimed(true);
+            setClaimStep('claimed_already');
+        }, 5000);
     };
 
     if (!mounted) return <div className="bg-black min-h-screen" />;
@@ -369,8 +361,30 @@ function GatekeeperApp() {
                                     disabled={!userAddress}
                                     className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-all flex items-center justify-center gap-2"
                                 >
-                                    Claim Assets <ArrowRight className="w-4 h-4" />
+                                    Continue to Biometric <Fingerprint className="w-4 h-4" />
                                 </button>
+                            </motion.div>
+                        )}
+
+                        {claimStep === 'biometric_scan' && showBiometric && (
+                            <motion.div key="biometric" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="bg-black/40 backdrop-blur-xl border border-white/10 p-8 rounded-3xl shadow-2xl max-w-md w-full">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="p-3 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600">
+                                        <Fingerprint className="w-6 h-6" />
+                                    </div>
+                                    <h2 className="text-2xl font-bold">Biometric Scan</h2>
+                                </div>
+                                
+                                <p className="text-white/60 mb-6 text-sm">
+                                    Use your device's biometric authentication (fingerprint, Face ID, or Windows Hello) to securely claim.
+                                </p>
+
+                                <BiometricPad
+                                    dropId={dropId || ''}
+                                    challenge={biometricChallenge}
+                                    receiverAddress={userAddress}
+                                    onSuccess={handleBiometricSuccess}
+                                />
                             </motion.div>
                         )}
 
